@@ -1,0 +1,46 @@
+name: CI
+
+# いつ実行するかを指定します
+on:
+  push:
+    branches: ["main"] # mainブランチにpushされた時
+  pull_request:
+    branches: ["main"] # mainブランチへのPRが作られた時
+
+# 実行するジョブの内容
+jobs:
+  build:
+    # 実行環境（Ubuntu Linuxを使用）
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x] # Node.jsのバージョン（package.jsonのtypes/nodeに合わせ推奨）
+
+    steps:
+      # 1. リポジトリのコードを取得
+      - uses: actions/checkout@v4
+
+      # 2. Node.jsのセットアップ
+      - name: Use Node.js ${{Ql matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      # 3. 依存関係のインストール (package-lock.jsonを使うため npm ci)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. コンパイル (package.jsonの "compile" スクリプトを実行)
+      - name: Compile
+        run: npm run compile
+
+      # 5. リントチェック (package.jsonの "lint" スクリプトを実行)
+      - name: Lint
+        run: npm run lint
+
+      # 6. テスト実行
+      # Linux環境でVS CodeのUIテストを動かすには仮想ディスプレイ(xvfb)が必要です
+      - name: Run Tests
+        run: xvfb-run -a npm test
