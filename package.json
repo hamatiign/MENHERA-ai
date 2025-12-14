@@ -17,7 +17,17 @@
         "command": "menhera-ai.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Menhera AI",
+      "properties": {
+        "menhera-ai.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Gemini API Key (ここにキーを入力してね)"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
