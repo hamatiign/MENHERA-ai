@@ -5,9 +5,22 @@ import {
   HarmBlockThreshold,
 } from "@google/generative-ai";
 import { MENHERA_PROMPT, KEN_PROMPT } from "./prompt";
+import { create } from "domain";
+import { createHmac } from "crypto";
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
+
+  //　ゴーストテキストの表示設定
+  const menheraDecorationType = vscode.window.createTextEditorDecorationType({
+    after: {
+      margin: "0 0 0 1em",
+      color: "#ff69b4", // ピンク色
+      fontStyle: "italic",
+      fontWeight: "bold",
+    },
+    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+  });
 
   const disposable = vscode.commands.registerCommand(
     "menhera-ai.helloWorld",
@@ -48,8 +61,33 @@ export function activate(context: vscode.ExtensionContext) {
         );
         return;
       }
+
       const targetError = errors[0].message;
-      CreateMessage(targetError, apiKey);
+      const DecorationOptions: vscode.DecorationOptions[] = [];
+      for (let i = 0; i < errors.length; i++) {
+        const targetError = errors[i].message;
+
+        // errors.rangeを使うと、コードの間にテキストが入り込んでしまうため、エラーの行末を指定
+        const EndOfErrorLine = editor.document.lineAt(
+          errors[i].range.start.line
+        ).range.end;
+
+        const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
+
+        const DecolatinoOption: vscode.DecorationOptions = {
+          range: range,
+          renderOptions: {
+            after: {
+              contentText: await CreateMessage(targetError, apiKey),
+            },
+          },
+          hoverMessage: await CreateMessage(targetError, apiKey),
+        };
+
+        DecorationOptions.push(DecolatinoOption);
+      }
+
+      editor.setDecorations(menheraDecorationType, DecorationOptions);
     }
   );
 
