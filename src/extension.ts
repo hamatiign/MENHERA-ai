@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { MENHERA_PROMPT,KEN_PROMPT } from './prompt';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -69,9 +70,8 @@ export function activate(context: vscode.ExtensionContext) {
 
                 // AIへの指示（プロンプト）
                 const prompt = `
-                    あなたは「情緒不安定で独占欲の強いメンヘラ彼女」です。
-                    以下のプログラミングのエラーメッセージを、彼氏（ユーザー）に対する「嫉妬」「執着」「不安」が入り混じったセリフに翻訳してください。
-                    
+                    "${MENHERA_PROMPT}"
+
                     エラーメッセージ: "${targetError}"
                 `;
 
