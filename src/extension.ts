@@ -48,61 +48,8 @@ export function activate(context: vscode.ExtensionContext) {
         );
         return;
       }
-
       const targetError = errors[0].message;
-
-      await vscode.window.withProgress(
-        {
-          location: vscode.ProgressLocation.Notification,
-          title: "メンヘラ化中...",
-          cancellable: false,
-        },
-        async () => {
-          try {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({
-              model: "gemini-flash-latest",
-              // メンヘラ構文が攻撃的だとブロックされるので、セーフティを外す必要がある
-              safetySettings: [
-                {
-                  category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                  threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                  category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                  threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                  category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                  threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-                {
-                  category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                  threshold: HarmBlockThreshold.BLOCK_NONE,
-                },
-              ],
-            });
-
-            // AIへの指示（プロンプト）
-            const prompt = `
-                    "${MENHERA_PROMPT}"
-
-                    エラーメッセージ: "${targetError}"
-                `;
-
-            const result = await model.generateContent(prompt);
-            const response = result.response.text();
-
-            // 結果を表示
-            vscode.window.showInformationMessage(response);
-          } catch (err) {
-            console.error(err);
-            vscode.window.showErrorMessage(
-              "通信エラー...誰と電話してたの？怒るよ？(API Error)"
-            );
-          }
-        }
-      );
+      CreateMessage(targetError, apiKey);
     }
   );
 
@@ -110,3 +57,60 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
+
+const CreateMessage = async (
+  targetError: string,
+  apiKey: string
+): Promise<string> => {
+  return vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "メンヘラ化中...",
+      cancellable: false,
+    },
+    async () => {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({
+          model: "gemini-flash-latest",
+          // メンヘラ構文が攻撃的だとブロックされるので、セーフティを外す必要がある
+          safetySettings: [
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+          ],
+        });
+
+        // AIへの指示（プロンプト）
+        const prompt = `
+                    "${KEN_PROMPT}"
+
+                    エラーメッセージ: "${targetError}"
+                `;
+
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
+        return response;
+      } catch (err) {
+        console.error(err);
+        vscode.window.showErrorMessage(
+          "通信エラー...誰と電話してたの？怒るよ？(API Error)"
+        );
+        return "API error";
+      }
+    }
+  );
+};
