@@ -1,36 +1,70 @@
 import * as vscode from "vscode";
 
-export function activate(context: vscode.ExtensionContext) {
-  // 起動確認ログ
-  console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
+// 装飾（ゴーストテキスト）のスタイルを定義
+// ピンク色で、斜体にして、少し左に隙間(margin)を空ける設定です
+const menheraDecorationType = vscode.window.createTextEditorDecorationType({
+  after: {
+    margin: "0 0 0 1em", // コードから1文字分あける
+    color: "#ff69b4", // メンヘラピンク
+    fontStyle: "italic", // 怖い感じを出す斜体
+  },
+  rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+});
 
-  // コマンドが実行されたときの処理
-  // ※ 'menhera-ai.helloWorld' の部分は package.json の "command" と同じにする必要があります
+export function activate(context: vscode.ExtensionContext) {
+  console.log("メンヘラCopilot (Ghost Ver) が起動しました...");
+
   const disposable = vscode.commands.registerCommand(
     "menhera-ai.helloWorld",
     () => {
-      // 【重要】ここで「今開いているエディタ」を取得します
       const editor = vscode.window.activeTextEditor;
 
-      // エディタが存在するかチェック（ここがさっきのエラーの対策！）
       if (editor) {
-        // ファイルが開かれている場合
+        // -----------------------------------------------------------
+        // 1. 定型文リスト（APIを使わないので手動で用意）
+        // -----------------------------------------------------------
         const messages = [
           "ねぇ、その変数名なに？浮気？",
           "コード動いたね…でも私の心は動かないよ",
           "エラー出てないけど、私への愛は足りてる？",
           "そんな書き方して...私のこと嫌いなんでしょ？",
+          "ずっと見てるからね...ずっと...",
+          "私と仕事、どっちが大事なの？",
         ];
-        // ランダムにセリフを選ぶ
+
+        // ランダムに1つ選ぶ
         const randomMsg = messages[Math.floor(Math.random() * messages.length)];
 
-        vscode.window.showInformationMessage(randomMsg);
+        // -----------------------------------------------------------
+        // 2. 表示する場所を決める（今回はカーソルがある行の末尾）
+        // -----------------------------------------------------------
+        const position = editor.selection.active; // 現在のカーソル位置
+        const line = editor.document.lineAt(position.line); // その行の情報を取得
+
+        // 行の「一番最後」を範囲として指定する
+        const range = new vscode.Range(line.range.end, line.range.end);
+
+        // -----------------------------------------------------------
+        // 3. 装飾データを作成（ここがゴーストテキストの正体）
+        // -----------------------------------------------------------
+        const decoration: vscode.DecorationOptions = {
+          range: range,
+          renderOptions: {
+            after: {
+              // ここに表示したい文字を入れる
+              contentText: `  ← ${randomMsg} 🔪`,
+            },
+          },
+        };
+
+        // -----------------------------------------------------------
+        // 4. エディタに適用
+        // -----------------------------------------------------------
+        // ※これを実行すると、前の装飾は消えて新しいのがつきます
+        editor.setDecorations(menheraDecorationType, [decoration]);
       } else {
-        // 【対策】ファイルが開かれていない場合
-        // ここで .document にアクセスしようとすると死ぬので、
-        // エラーメッセージだけ出して終わらせます。
         vscode.window.showErrorMessage(
-          "ファイル開いてないじゃん…私のこと無視する気？信じられない..."
+          "ファイル開いてないじゃん…私のこと無視する気？"
         );
       }
     }
