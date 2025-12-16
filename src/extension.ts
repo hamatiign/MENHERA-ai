@@ -59,6 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(
           "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
         );
+        editor.setDecorations(menheraDecorationType, []);
         return;
       }
 
