@@ -8,23 +8,27 @@ import { MENHERA_PROMPT, KEN_PROMPT } from "./prompt";
 import { create } from "domain";
 import { createHmac } from "crypto";
 import responsesData from "./data/responses.json";
+import { error } from "console";
+
+//　ゴーストテキストの表示設定
+const menheraDecorationType = vscode.window.createTextEditorDecorationType({
+  after: {
+    margin: "0 0 0 1em",
+    color: "#ff69b4", // ピンク色
+    fontStyle: "italic",
+    fontWeight: "bold",
+  },
+  rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+});
 
 // 型定義（TypeScriptにJSONの中身が文字列の辞書だと教える）
 const responses: { [key: string]: string } = responsesData;
 
+// -1: 初期状態, 0以上: 前回のエラー数
+let previousErrorCount = -1;
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
-
-  //　ゴーストテキストの表示設定
-  const menheraDecorationType = vscode.window.createTextEditorDecorationType({
-    after: {
-      margin: "0 0 0 1em",
-      color: "#ff69b4", // ピンク色
-      fontStyle: "italic",
-      fontWeight: "bold",
-    },
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-  });
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
@@ -55,15 +59,21 @@ export function activate(context: vscode.ExtensionContext) {
     const errors = diagnostics.filter(
       (d) => d.severity === vscode.DiagnosticSeverity.Error
     );
-
     if (errors.length === 0) {
-      vscode.window.showInformationMessage(
-        "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
-      );
       editor.setDecorations(menheraDecorationType, []);
+      if (previousErrorCount === -1 || previousErrorCount > 0) {
+        vscode.window.showInformationMessage(
+          "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
+        );
+        previousErrorCount = 0;
+        return;
+      }
+      previousErrorCount = 0;
       return;
     }
 
+    // 以下エラーがあった場合の処理
+    previousErrorCount = errors.length;
     const DecorationOptions: vscode.DecorationOptions[] = [];
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
