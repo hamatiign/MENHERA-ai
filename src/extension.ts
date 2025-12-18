@@ -26,75 +26,100 @@ export function activate(context: vscode.ExtensionContext) {
     rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
   });
 
-  const disposable = vscode.commands.registerCommand(
-    "menhera-ai.helloWorld",
-    async () => {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor) {
-        vscode.window.showErrorMessage(
-          "ファイル開いてないじゃん…私のこと無視する気？"
-        );
-        return;
-      }
-
-      const config = vscode.workspace.getConfiguration("menhera-ai");
-      const apiKey = config.get<string>("apiKey");
-
-      if (!apiKey) {
-        const action = await vscode.window.showErrorMessage(
-          "APIキー設定してないよね？私のこと本気じゃないんだ... (設定を開きますか？)",
-          "設定を開く"
-        );
-        if (action === "設定を開く") {
-          vscode.commands.executeCommand(
-            "workbenchPc.action.openSettings",
-            "menhera-ai.apiKey"
-          );
-        }
-        return;
-      }
-
-      const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-      const errors = diagnostics.filter(
-        (d) => d.severity === vscode.DiagnosticSeverity.Error
+  const updateDecorations = async (editor: vscode.TextEditor) => {
+    if (!editor) {
+      vscode.window.showErrorMessage(
+        "ファイル開いてないじゃん…私のこと無視する気？"
       );
+      return;
+    }
 
-      if (errors.length === 0) {
-        vscode.window.showInformationMessage(
-          "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
+    const config = vscode.workspace.getConfiguration("menhera-ai");
+    const apiKey = config.get<string>("apiKey");
+
+    if (!apiKey) {
+      const action = await vscode.window.showErrorMessage(
+        "APIキー設定してないよね？私のこと本気じゃないんだ... (設定を開きますか？)",
+        "設定を開く"
+      );
+      if (action === "設定を開く") {
+        vscode.commands.executeCommand(
+          "workbenchPc.action.openSettings",
+          "menhera-ai.apiKey"
         );
-        editor.setDecorations(menheraDecorationType, []);
-        return;
       }
+      return;
+    }
 
-      const DecorationOptions: vscode.DecorationOptions[] = [];
-      for (let i = 0; i < errors.length; i++) {
-        const targetError = errors[i];
+    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const errors = diagnostics.filter(
+      (d) => d.severity === vscode.DiagnosticSeverity.Error
+    );
 
-        // errors.rangeを使うと、コードの間にテキストが入り込んでしまうため、エラーの行末を指定
-        const EndOfErrorLine = editor.document.lineAt(
-          errors[i].range.start.line
-        ).range.end;
+    if (errors.length === 0) {
+      vscode.window.showInformationMessage(
+        "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
+      );
+      editor.setDecorations(menheraDecorationType, []);
+      return;
+    }
 
-        const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-        const DecolatinoOption: vscode.DecorationOptions = {
-          range: range,
-          renderOptions: {
-            after: {
-              contentText: await CreateMessage(targetError, apiKey),
-            },
+    const DecorationOptions: vscode.DecorationOptions[] = [];
+    for (let i = 0; i < errors.length; i++) {
+      const targetError = errors[i];
+
+      // errors.rangeを使うと、コードの間にテキストが入り込んでしまうため、エラーの行末を指定
+      const EndOfErrorLine = editor.document.lineAt(errors[i].range.start.line)
+        .range.end;
+
+      const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
+      const DecolatinoOption: vscode.DecorationOptions = {
+        range: range,
+        renderOptions: {
+          after: {
+            contentText: await CreateMessage(targetError, apiKey),
           },
-          hoverMessage: await CreateMessage(targetError, apiKey),
-        };
+        },
+        hoverMessage: await CreateMessage(targetError, apiKey),
+      };
 
-        DecorationOptions.push(DecolatinoOption);
+      DecorationOptions.push(DecolatinoOption);
+    }
+
+    editor.setDecorations(menheraDecorationType, DecorationOptions);
+  };
+
+  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
+    (event) => {
+      const editor = vscode.window.activeTextEditor;
+      // イベントが起きたファイルが、今開いているファイルと同じなら実行
+      if (
+        editor &&
+        event.uris.some(
+          (uri) => uri.toString() === editor.document.uri.toString()
+        )
+      ) {
+        updateDecorations(editor);
       }
-
-      editor.setDecorations(menheraDecorationType, DecorationOptions);
     }
   );
 
-  context.subscriptions.push(disposable);
+  // 2. 開いているタブ（ファイル）を切り替えた時
+  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(
+    (editor) => {
+      if (editor) {
+        updateDecorations(editor);
+      }
+    }
+  );
+
+  context.subscriptions.push(diagnosticDisposable);
+  context.subscriptions.push(editorChangeDisposable);
+
+  // 3. 起動時に一度だけ実行（すでにファイルを開いている場合用）
+  if (vscode.window.activeTextEditor) {
+    updateDecorations(vscode.window.activeTextEditor);
+  }
 }
 
 export function deactivate() {}
