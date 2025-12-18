@@ -7,6 +7,10 @@ import {
 import { MENHERA_PROMPT, KEN_PROMPT } from "./prompt";
 import { create } from "domain";
 import { createHmac } from "crypto";
+import responsesData from "./data/responses.json";
+
+// 型定義（TypeScriptにJSONの中身が文字列の辞書だと教える）
+const responses: { [key: string]: string } = responsesData;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
@@ -63,10 +67,9 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      const targetError = errors[0].message;
       const DecorationOptions: vscode.DecorationOptions[] = [];
       for (let i = 0; i < errors.length; i++) {
-        const targetError = errors[i].message;
+        const targetError = errors[i];
 
         // errors.rangeを使うと、コードの間にテキストが入り込んでしまうため、エラーの行末を指定
         const EndOfErrorLine = editor.document.lineAt(
@@ -74,7 +77,6 @@ export function activate(context: vscode.ExtensionContext) {
         ).range.end;
 
         const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-
         const DecolatinoOption: vscode.DecorationOptions = {
           range: range,
           renderOptions: {
@@ -97,10 +99,33 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {}
 
+const GetJsonKey = (error: vscode.Diagnostic) => {
+  const source = error.source ? error.source.toLowerCase() : "unknown";
+
+  let codeString = "unknown";
+
+  // 型チェックをして中身を取り出す
+  if (typeof error.code === "string" || typeof error.code === "number") {
+    // 文字列か数字なら、そのまま文字列化
+    codeString = String(error.code);
+  } else if (typeof error.code === "object" && error.code !== null) {
+    // オブジェクトなら、.value の中身を使う
+    codeString = String(error.code?.value);
+  }
+
+  console.log(codeString); // -> "2322" や "no-unused-vars" になる
+  console.log("jsonkey:", `${source}-${codeString}`);
+  return `${source}-${codeString}`;
+};
+
 const CreateMessage = async (
-  targetError: string,
+  targetError: vscode.Diagnostic,
   apiKey: string
 ): Promise<string> => {
+  if (responses[GetJsonKey(targetError)]) {
+    return responses[GetJsonKey(targetError)];
+  }
+
   return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -137,7 +162,7 @@ const CreateMessage = async (
         const prompt = `
                     "${KEN_PROMPT}"
 
-                    エラーメッセージ: "${targetError}"
+                    エラーメッセージ: "${targetError.message}"
                 `;
 
         const result = await model.generateContent(prompt);
