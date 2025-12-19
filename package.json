@@ -9,7 +9,12 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:javascript",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascriptreact"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -17,7 +22,17 @@
         "command": "menhera-ai.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Menhera AI",
+      "properties": {
+        "menhera-ai.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Gemini APIキーを入力してください"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -41,5 +56,6 @@
     "@google/generative-ai": "^0.24.1",
     "play-sound": "^1.1.6",
     "say": "^0.16.0"
+    "dotenv": "^17.2.3"
   }
 }
