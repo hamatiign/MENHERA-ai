@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { MenheraViewProvider } from './mascotView';
 const say = require('say');
 const path = require('path');
 import {
@@ -27,6 +28,12 @@ let previousErrorCount = -1;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
+  const mascotProvider = new MenheraViewProvider(context.extensionUri);
+
+    // ビューを登録（package.jsonに書いたIDと一致させる）
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(MenheraViewProvider.viewType, mascotProvider)
+    );
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
@@ -55,12 +62,12 @@ export function activate(context: vscode.ExtensionContext) {
       (d) => d.severity === vscode.DiagnosticSeverity.Error
     );
 
-    if (errors.length === 0) {
+if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
       if (previousErrorCount === -1 || previousErrorCount > 0) {
-        vscode.window.showInformationMessage(
-          "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
-        );
+        const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
+        vscode.window.showInformationMessage(msg);
+        mascotProvider.updateMessage(msg); // ★ここ：マスコットに喋らせる
       }
       previousErrorCount = 0;
       return;
@@ -90,6 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
+    mascotProvider.updateMessage('仮メッセージ');
   };
 
   const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
