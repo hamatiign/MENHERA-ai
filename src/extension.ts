@@ -11,7 +11,7 @@ import { createHmac } from "crypto";
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
 
-  //　ゴーストテキストの表示設定
+  // ゴーストテキストの表示設定
   const menheraDecorationType = vscode.window.createTextEditorDecorationType({
     after: {
       margin: "0 0 0 1em",
