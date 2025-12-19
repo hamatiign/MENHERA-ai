@@ -27,22 +27,24 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
 
     private _getHtmlForWebview(webview: vscode.Webview) {
         // ロゴ画像のパスを取得
-        const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'menhera_logo.png'));
+        const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', '../src/assets/images/menhera_logo.png'));
 
         return `<!DOCTYPE html>
         <html lang="ja">
         <head>
             <style>
-                body { 
+                body {
+                    background-color: #0f0f0f;
+                    color: #ff8ce0;
                     display: flex; 
                     flex-direction: column; 
                     align-items: center; 
-                    padding: 10px; 
-                    color: var(--vscode-editor-foreground);
+                    padding: 10px;
                 }
                 .bubble {
                     position: relative;
                     background: #ff69b4;
+                    border: 2px solid #ff8ce0;
                     border-radius: 15px;
                     padding: 10px;
                     color: white;
