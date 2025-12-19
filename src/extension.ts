@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 const say = require('say');
 const path = require('path'); // ▼ パス操作のために追加
-import * as vscode from "vscode";
+
 import {
   GoogleGenerativeAI,
   HarmCategory,
@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
       return;
     }
-
+    
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
 
@@ -151,6 +151,41 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(disposable);
+
+
+ 
+
+  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
+    (event) => {
+      const editor = vscode.window.activeTextEditor;
+      // イベントが起きたファイルが、今開いているファイルと同じなら実行
+      if (
+        editor &&
+        event.uris.some(
+          (uri) => uri.toString() === editor.document.uri.toString()
+        )
+      ) {
+        updateDecorations(editor);
+      }
+    }
+  );
+
+  // 2. 開いているタブ（ファイル）を切り替えた時
+  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(
+    (editor) => {
+      if (editor) {
+        updateDecorations(editor);
+      }
+    }
+  );
+
+  context.subscriptions.push(diagnosticDisposable);
+  context.subscriptions.push(editorChangeDisposable);
+
+  // 3. 起動時に一度だけ実行（すでにファイルを開いている場合用）
+  if (vscode.window.activeTextEditor) {
+    updateDecorations(vscode.window.activeTextEditor);
+  }
 }
 
 // HTMLの中身を作る関数
@@ -188,40 +223,6 @@ function getWebviewContent(imageUri: vscode.Uri, text: string) {
         <h1>${text}</h1>
     </body>
     </html>`;
-}
-
-export function deactivate() {}
-  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
-    (event) => {
-      const editor = vscode.window.activeTextEditor;
-      // イベントが起きたファイルが、今開いているファイルと同じなら実行
-      if (
-        editor &&
-        event.uris.some(
-          (uri) => uri.toString() === editor.document.uri.toString()
-        )
-      ) {
-        updateDecorations(editor);
-      }
-    }
-  );
-
-  // 2. 開いているタブ（ファイル）を切り替えた時
-  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(
-    (editor) => {
-      if (editor) {
-        updateDecorations(editor);
-      }
-    }
-  );
-
-  context.subscriptions.push(diagnosticDisposable);
-  context.subscriptions.push(editorChangeDisposable);
-
-  // 3. 起動時に一度だけ実行（すでにファイルを開いている場合用）
-  if (vscode.window.activeTextEditor) {
-    updateDecorations(vscode.window.activeTextEditor);
-  }
 }
 
 export function deactivate() {}
