@@ -1,39 +1,95 @@
 import * as vscode from 'vscode';
+const say = require('say');
+const path = require('path'); // ▼ パス操作のために追加
 
 export function activate(context: vscode.ExtensionContext) {
 
-    // 起動確認ログ
-    console.log('メンヘラCopilotが起動しました...ずっと見てるからね。');
+    console.log('メンヘラCopilotが起動しました...ずっと見てるらね…');
 
-    // コマンドが実行されたときの処理
-    // ※ 'menhera-ai.helloWorld' の部分は package.json の "command" と同じにする必要があります
     const disposable = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
         
-        // 【重要】ここで「今開いているエディタ」を取得します
         const editor = vscode.window.activeTextEditor;
 
-        // エディタが存在するかチェック（ここがさっきのエラーの対策！）
         if (editor) {
-            // ファイルが開かれている場合
+            // 通常時
             const messages = [
                 'ねぇ、その変数名なに？浮気？',
                 'コード動いたね…でも私の心は動かないよ',
-                'エラー出てないけど、私への愛は足りてる？',
-                'そんな書き方して...私のこと嫌いなんでしょ？'
+                'エラー出てないけど、私への愛は足りてる？'
             ];
-            // ランダムにセリフを選ぶ
             const randomMsg = messages[Math.floor(Math.random() * messages.length)];
             
             vscode.window.showInformationMessage(randomMsg);
+            say.speak(randomMsg, null, 1.0);
+
         } else {
-            // 【対策】ファイルが開かれていない場合
-            // ここで .document にアクセスしようとすると死ぬので、
-            // エラーメッセージだけ出して終わらせます。
-            vscode.window.showErrorMessage('ファイル開いてないじゃん…私のこと無視する気？信じられない...');
+            // --- エラー時（ファイルを開いていない＝無視されている！） ---
+            
+            const errorMsg = 'ファイル開いてないじゃん…私のこと無視する気？信じられない...';
+            
+            // 1. エラーメッセージを出しつつ読み上げ
+            vscode.window.showErrorMessage(errorMsg);
+            say.speak(errorMsg, null, 1.0);
+
+            // 2. ▼ 画像を表示するパネルを作成（ここが追加部分！）
+            const panel = vscode.window.createWebviewPanel(
+                'menheraAngry', // 内部的なID
+                '激怒中',       // タブに表示されるタイトル
+                vscode.ViewColumn.Two, // 右側のカラムに表示（Two）
+                {}
+            );
+
+            // 3. 画像パスをWebview用に変換
+            // ディスク上のパスを取得
+            const onDiskPath = vscode.Uri.file(
+                path.join(context.extensionPath, 'images', 'menhela-first.png')
+            );
+            // Webviewで使える形式(vscode-resource:...)に変換
+            const imageUri = panel.webview.asWebviewUri(onDiskPath);
+
+            // 4. HTMLを設定して画像を表示
+            panel.webview.html = getWebviewContent(imageUri, errorMsg);
         }
     });
 
     context.subscriptions.push(disposable);
+}
+
+// HTMLの中身を作る関数
+function getWebviewContent(imageUri: vscode.Uri, text: string) {
+    return `<!DOCTYPE html>
+    <html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <title>激怒</title>
+        <style>
+            body {
+                background-color: #2b0000; /* 背景を赤黒くして恐怖感を演出 */
+                color: white;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify_content: center;
+                height: 100vh;
+                margin: 0;
+            }
+            img {
+                max-width: 80%;
+                border: 5px solid red;
+                box-shadow: 0 0 20px red;
+            }
+            h1 {
+                margin-top: 20px;
+                font-family: sans-serif;
+                text-shadow: 2px 2px 4px #000;
+            }
+        </style>
+    </head>
+    <body>
+        <img src="${imageUri}" />
+        <h1>${text}</h1>
+    </body>
+    </html>`;
 }
 
 export function deactivate() {}
