@@ -23,7 +23,6 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
 
 const responses: { [key: string]: string } = responsesData;
 
-// -1: 初期状態, 0以上: 前回のエラー数
 let previousErrorCount = -1;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -67,7 +66,7 @@ if (errors.length === 0) {
       if (previousErrorCount === -1 || previousErrorCount > 0) {
         const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
         vscode.window.showInformationMessage(msg);
-        mascotProvider.updateMessage(msg); // ★ここ：マスコットに喋らせる
+        mascotProvider.updateMessage(msg);
       }
       previousErrorCount = 0;
       return;
