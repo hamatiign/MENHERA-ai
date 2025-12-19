@@ -84,7 +84,7 @@ if (errors.length === 0) {
       // APIまたはJSONからメッセージを取得
       const message = await CreateMessage(targetError, apiKey);
 
-      const decolatinoOption: vscode.DecorationOptions = {
+      const decorationOption: vscode.DecorationOptions = {
         range: range,
         renderOptions: {
           after: { contentText: message },
@@ -92,7 +92,7 @@ if (errors.length === 0) {
         hoverMessage: message,
       };
 
-      DecorationOptions.push(decolatinoOption);
+      DecorationOptions.push(decorationOption);
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
