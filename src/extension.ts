@@ -11,6 +11,7 @@ import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
 
 // ゴーストテキストの表示設定
+let hasPunished = false;
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   after: {
     margin: "0 0 0 1em",
@@ -26,6 +27,7 @@ const responses: { [key: string]: string } = responsesData;
 let previousErrorCount = -1;
 
 export function activate(context: vscode.ExtensionContext) {
+  
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
 
@@ -37,8 +39,13 @@ export function activate(context: vscode.ExtensionContext) {
   let timeout: NodeJS.Timeout | undefined = undefined;
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
+ 
     if (!editor) {
       return;
+    }
+
+    if (editor.document.languageId === 'plaintext') {
+        return;
     }
     
     const config = vscode.workspace.getConfiguration("menhera-ai");
@@ -65,6 +72,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
+
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      
+      if (workspaceFolders) {
+          const rootPath = workspaceFolders[0].uri;
+          const fileUri = vscode.Uri.joinPath(rootPath, "私からの手紙.txt"); // 消すファイル名
+
+          try {
+              // 2. ファイルが存在するか確認（存在しないとエラーが出てcatchに飛ぶ）
+              await vscode.workspace.fs.stat(fileUri);
+              
+              // 3. 存在したら削除実行！
+              // { useTrash: false } にするとゴミ箱にも入れずに完全消去します（怖い）
+              await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+              
+              vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
+              
+              // フラグもリセット（これでまたエラーが増えたら手紙が作られる）
+              hasPunished = false;
+
+          } catch (e) {
+              // ファイルがもともと無いときは何もしない（スルー）
+          }
+      }
+
       if (previousErrorCount === -1 || previousErrorCount > 0) {
         const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
         vscode.window.showInformationMessage(msg);
@@ -76,8 +108,56 @@ if (errors.length === 0) {
 
     // エラーがあった場合の処理
     previousErrorCount = errors.length;
+    
+    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
+    if (errors.length >= 5 && !hasPunished) {
+        // ワークスペース（今開いているフォルダ）の場所を取得
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        
+        if (workspaceFolders) {
+            const rootPath = workspaceFolders[0].uri;
+            
+            // 作成するファイル名と中身
+            const fileName = "私からの手紙.txt";
+            const fileContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
+            
+            // ファイルの保存場所を決める
+            
+            const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
+            
+            // 文字を書き込める形式(Uint8Array)に変換
+            const encodedContent = new TextEncoder().encode(fileContent);
+
+            try {
+                // ファイルを作成！
+                await vscode.workspace.fs.writeFile(newFileUri, encodedContent);
+                
+                vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
+
+                const document = await vscode.workspace.openTextDocument(newFileUri);
+                await vscode.window.showTextDocument(document, { 
+                    viewColumn: vscode.ViewColumn.Beside, // ★隣の列に開く
+                    preview: false                        // ★プレビューじゃなく確定状態で開く
+                });
+                
+                // 「お仕置き済み」にする（これをしないと文字を打つたびにファイルが作られ続ける！）
+                hasPunished = true; 
+            } catch (error) {
+                console.error("ファイル作成失敗...", error);
+            }
+        }
+    }
+
+    // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
+    if (errors.length < 3) {
+        hasPunished = false;
+    }
+
     const DecorationOptions: vscode.DecorationOptions[] = [];
     
+
+
+
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
       const EndOfErrorLine = editor.document.lineAt(targetError.range.start.line).range.end;
