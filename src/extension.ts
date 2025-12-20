@@ -80,62 +80,41 @@ export function activate(context: vscode.ExtensionContext) {
 
 if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
-
       await changeWindowColor(false);
+
+      if (stagnationTimeout) {
+          clearTimeout(stagnationTimeout);
+          stagnationTimeout = undefined;
+      }
 
       const workspaceFolders = vscode.workspace.workspaceFolders;
       
       if (workspaceFolders) {
           const rootPath = workspaceFolders[0].uri;
-          const fileUri = vscode.Uri.joinPath(rootPath, "私からの手紙.txt"); // 消すファイル名
-          const deleteFile = vscode.Uri.joinPath(rootPath, "まだ直さないの.txt");
+          const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
 
-          try {
-             // 今開いている全タブの中から「私からの手紙.txt」を探す
-              const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
-              const letterTab = tabs.find(tab => 
-                  tab.input instanceof vscode.TabInputText && 
-                  tab.input.uri.path.endsWith("私からの手紙.txt")
-              );
-              
-              // 見つかったら閉じる
-              if (letterTab) {
-                  await vscode.window.tabGroups.close(letterTab);
-              }
+          for (const fileName of filesToDelete) {
+              const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+              try {
+                  // タブを閉じる
+                  const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
+                  const targetTab = tabs.find(tab => 
+                      tab.input instanceof vscode.TabInputText && 
+                      tab.input.uri.path.endsWith(fileName)
+                  );
+                  if (targetTab) { await vscode.window.tabGroups.close(targetTab); }
 
-              // 1. まずファイルがあるか確認
-              await vscode.workspace.fs.stat(fileUri);
-              
-              // 2. 中身を空っぽにする（上書き）
-              await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-              
-              // 3. その後、ファイルを削除する
-              await vscode.workspace.fs.delete(fileUri, { useTrash: false });
-              
-              vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
-              
-              // フラグもリセット（これでまたエラーが増えたら手紙が作られる）
-              hasPunished = false;
-
-          } catch (e) {
-              // ファイルがもともと無いときは何もしない（スルー）
+                  // ファイル削除
+                  await vscode.workspace.fs.stat(fileUri);
+                  await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+              } catch (e) { /* 無視 */ }
           }
 
-          try {
-              // 2. ファイルが存在するか確認（存在しないとエラーが出てcatchに飛ぶ）
-              await vscode.workspace.fs.stat(deleteFile);
-              
-              // 3. 存在したら削除実行！
-              // { useTrash: false } にするとゴミ箱にも入れずに完全消去します（怖い）
-              await vscode.workspace.fs.delete(deleteFile, { useTrash: true });
-              
-              
-              // フラグもリセット（これでまたエラーが増えたら手紙が作られる）
-              hasPunished = false;
-
-          } catch (e) {
-              // ファイルがもともと無いときは何もしない（スルー）
+          if (hasPunished || morePunished) {
+            vscode.window.showInformationMessage("機嫌なおったから、手紙全部捨てといたよ！");
           }
+          hasPunished = false;
+          morePunished = false;
       }
 
       if (previousErrorCount === -1 || previousErrorCount > 0) {
@@ -152,96 +131,39 @@ if (errors.length === 0) {
     
     // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---}
     // 💀 お仕置きタイム
-    if (errors.length >= 5 && !hasPunished) {
-        hasPunished = true; // 連打防止フラグ
-
-        await changeWindowColor(true);
-
+    if (errors.length >= 5) {
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders) {
-            const fileName = "私からの手紙.txt";
-            const messageContent = "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n画面、真っ赤にしちゃった。\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？";
+
+        // A. 最初のお仕置き（即時発動）
+        if (!hasPunished && workspaceFolders) {
+            hasPunished = true;
+            await changeWindowColor(true);
+            vscode.window.showErrorMessage("エラー直してくれないから...ね？");
             
-            const rootPath = workspaceFolders[0].uri;
-            const fileUri = vscode.Uri.joinPath(rootPath, fileName);
-            
-            try {
-                vscode.window.showErrorMessage("エラー直してくれないから...ね？");
+            // 共通関数で手紙を作成
+            runPunishmentLogic(workspaceFolders, "私からの手紙.txt", "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？"); 
+        }
 
-                // ▼▼▼ 修正のキモ：すでに開いているかチェックする！ ▼▼▼
-                const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
+        // B. 追撃タイマー（まだ追撃してなくて、タイマーも動いてなければセット）
+        if (!stagnationTimeout && !morePunished && workspaceFolders) {
+            stagnationTimeout = setTimeout(async () => {
+              vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
+                // 共通関数で追撃ファイルを作成
+                await runPunishmentLogic(workspaceFolders, "まだ直さないの.txt", "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。");
                 
-                let document: vscode.TextDocument;
-
-                if (openedDoc) {
-                    // A. すでに開いているなら、それを使う（勝手にファイルを作らない！）
-                    document = openedDoc;
-                } else {
-                    // B. 開いていないなら、ファイルがあるか確認して、なければ作る
-                    try {
-                        await vscode.workspace.fs.stat(fileUri);
-                    } catch {
-                        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-                    }
-                    document = await vscode.workspace.openTextDocument(fileUri);
-                }
-                // ▲▲▲▲▲▲▲▲▲
-
-                // エディタを表示
-                const letterEditor = await vscode.window.showTextDocument(document, { 
-                    viewColumn: vscode.ViewColumn.Beside,
-                    preview: false 
-                });
-
-                // 中身を全消し（リセット）
-                await letterEditor.edit(editBuilder => {
-                    const lastLine = document.lineAt(document.lineCount - 1);
-                    const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
-                    editBuilder.delete(range);
-                });
-
-                // 書き込み開始
-                await typeWriter(letterEditor, messageContent);
                 
-            } catch (error) {
-                console.error("お仕置き失敗...", error);
-                hasPunished = false;
-            }
+                morePunished = true;
+                stagnationTimeout = undefined; // 実行終わったらクリア
+            }, 30000); // 30秒後に発動
+        }
+
+    } else {
+        // エラーが5個未満になったら、追撃タイマーは解除してあげる
+        if (stagnationTimeout) {
+            clearTimeout(stagnationTimeout);
+            stagnationTimeout = undefined;
         }
     }
-
-    // エラーが5個以上のままなら、30秒後の時限爆弾をセット
-        if (errors.length >= 5) {
-            stagnationTimeout = setTimeout(async () => {
-                const workspaceFolders = vscode.workspace.workspaceFolders;
-                if (workspaceFolders) {
-                    const rootPath = workspaceFolders[0].uri;
-                    // 追撃用ファイル名
-                    const curseFileName = "まだ直さないの.txt";
-                    const curseContent = "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。";
-                    const curseFileUri = vscode.Uri.joinPath(rootPath, curseFileName);
-
-                    try {
-                        // ファイル作成
-                        await vscode.workspace.fs.writeFile(curseFileUri, new Uint8Array());
-                        
-                        // メッセージ表示
-                        vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
-                        
-                        // ファイルを開く
-                        const doc = await vscode.workspace.openTextDocument(curseFileUri);
-                        const noFixLetter =  await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside, preview: false });
-                        
-                        typeWriter(noFixLetter, curseContent);
-
-                        morePunished = true;
-
-                    } catch (e) {
-                        console.error("追撃失敗", e);
-                    }
-                }
-            }, 10000); // 30秒後に実行
-        }
 
     // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
     if (errors.length < 3) {
@@ -436,6 +358,44 @@ async function typeWriter(editor: vscode.TextEditor, text: string) {
     }
 
     await editor.document.save();
+}
+
+async function runPunishmentLogic(workspaceFolders: readonly vscode.WorkspaceFolder[], fileName: string, content: string) {
+    const rootPath = workspaceFolders[0].uri;
+    const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+    
+    try {
+        // すでに開いているかチェック（競合エラー回避）
+        const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
+        let document: vscode.TextDocument;
+
+        if (openedDoc) {
+            document = openedDoc;
+        } else {
+            try {
+                await vscode.workspace.fs.stat(fileUri);
+            } catch {
+                await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+            }
+            document = await vscode.workspace.openTextDocument(fileUri);
+        }
+
+        const editor = await vscode.window.showTextDocument(document, { 
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false 
+        });
+
+        // 中身を全消ししてから書く（重複防止）
+        await editor.edit(editBuilder => {
+            const lastLine = document.lineAt(document.lineCount - 1);
+            const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+            editBuilder.delete(range);
+        });
+
+        await typeWriter(editor, content);
+    } catch (e) {
+        console.error("お仕置き失敗", e);
+    }
 }
 
 const CreateMessage = async (
