@@ -76,8 +76,49 @@ if (errors.length === 0) {
 
     // エラーがあった場合の処理
     previousErrorCount = errors.length;
+    let hasPunished = false;
+    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
+    if (errors.length >= 5 && !hasPunished) {
+        // ワークスペース（今開いているフォルダ）の場所を取得
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        
+        if (workspaceFolders) {
+            const rootPath = workspaceFolders[0].uri;
+            
+            // 作成するファイル名と中身
+            const fileName = "私からの手紙.txt";
+            const fileContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
+            
+            // ファイルの保存場所を決める
+            const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
+            
+            // 文字を書き込める形式(Uint8Array)に変換
+            const encodedContent = new TextEncoder().encode(fileContent);
+
+            try {
+                // ファイルを作成！
+                await vscode.workspace.fs.writeFile(newFileUri, encodedContent);
+                
+                vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
+                
+                // 「お仕置き済み」にする（これをしないと文字を打つたびにファイルが作られ続ける！）
+                hasPunished = true; 
+            } catch (error) {
+                console.error("ファイル作成失敗...", error);
+            }
+        }
+    }
+
+    // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
+    if (errors.length < 3) {
+        hasPunished = false;
+    }
+
     const DecorationOptions: vscode.DecorationOptions[] = [];
     
+
+
+
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
       const EndOfErrorLine = editor.document.lineAt(targetError.range.start.line).range.end;
