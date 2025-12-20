@@ -173,7 +173,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
         const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
 
-        const angryMsg = `エラーこんなにあるじゃん…私のこと嫌いなの？`;
+        const angryMsg = `"エラーこんなにあるじゃん…私のこと嫌いなの？"`;
         currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
 
         currentPanel.onDidDispose(
@@ -269,7 +269,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
-    if (sidebarMessage) {
+    //激怒中は専用メッセージをマスコットへ渡す
+    if (errors.length >= 5) {
+      mascotProvider.updateMessage(
+        "エラーこんなにあるじゃん…私のこと嫌いなの？"
+      );
+    } else if (sidebarMessage) {
       mascotProvider.updateMessage(sidebarMessage);
     }
   };
