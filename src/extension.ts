@@ -160,12 +160,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ▼ エラー5個以上ならウィンドウを開く
     if (errors.length >= 5) {
+      //サイドバーを開く処理
+      vscode.commands.executeCommand('menhera-ai.mascotView.focus');
       mascotProvider.updateAngryMode(true);
       mascotProvider.updateMessage(
         "エラーこんなにあるじゃん…私のこと嫌いなの？"
       );
-      //サイドバーを開く処理
-      vscode.commands.executeCommand('menhera-ai.mascotView.focus');
 
       if (!currentPanel) {
         // currentPanel = vscode.window.createWebviewPanel(

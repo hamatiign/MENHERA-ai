@@ -32,8 +32,15 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
   }
   private _getHtmlForWebview(webview: vscode.Webview) {
     // ロゴ画像のパスを取得
+      const logoUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "images",
+        "new_menhera_logo.png"
+      )
+    );
     // const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
-    const menheraUri = webview.asWebviewUri(
+    const angryUri = webview.asWebviewUri(
       vscode.Uri.joinPath(
         this._extensionUri,
         "src/assets/images",
@@ -83,15 +90,21 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     border-color: #ff69b4 transparent;
                     transform: translateX(-50%);
                 }
-                .logo { width: 100px; height: auto; }
-                .menhera { width: auto; height: auto;}
+                
+                .mascot-image { width: auto; height: auto;}
+                
             </style>
         </head>
         <body>
             <div id="message" class="bubble">ねぇ、ずっとコード書いてるね。私のことも見てよ...</div>
-            <img class="menhera" src="${menheraUri}">
+            <img class="mascot-image" id="mascot-image" src="${logoUri}">
             <script>
                 const messageElement = document.getElementById('message');
+                const imageElement = document.getElementById('mascot-image');
+
+                const logoImgSrc = "${logoUri}";
+                const angryImgSrc = "${angryUri}";
+
                 window.addEventListener('message', event => {
                     const message = event.data;
                     if (message.type === 'updateText') {
@@ -100,9 +113,13 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     if(message.type === 'updateAngry') {
                         if (message.isAngry) {
                             document.body.classList.add('angry'); 
+                            imageElement.src = angryImgSrc;
                         } else {
                             document.body.classList.remove('angry');
+                            
+                          imageElement.src = logoImgSrc;
                         }
+
                     }
                 });
             </script>
