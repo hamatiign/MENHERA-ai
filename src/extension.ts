@@ -251,8 +251,7 @@ if (errors.length === 0) {
 
     const DecorationOptions: vscode.DecorationOptions[] = [];
     
-
-
+    let sidebarMessage = "";
 
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
@@ -261,6 +260,10 @@ if (errors.length === 0) {
       
       // APIまたはJSONからメッセージを取得
       const message = await CreateMessage(targetError, apiKey);
+
+      if (i === 0) {
+        sidebarMessage = message;
+      }
 
       const decorationOption: vscode.DecorationOptions = {
         range: range,
@@ -274,7 +277,9 @@ if (errors.length === 0) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
-    mascotProvider.updateMessage('仮メッセージ');
+    if (sidebarMessage) {
+      mascotProvider.updateMessage(sidebarMessage);
+    }
   };
 
   const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
@@ -295,7 +300,7 @@ if (errors.length === 0) {
         say.speak(errorMsg, null, 1.0);
 
         const panel = vscode.window.createWebviewPanel('menheraAngry', '激怒中', vscode.ViewColumn.Two, {});
-        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'images', 'menhela-first.png'));
+        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'images', 'new_menhera_logo.png'));
         const imageUri = panel.webview.asWebviewUri(onDiskPath);
         panel.webview.html = getWebviewContent(imageUri, errorMsg);
     }
