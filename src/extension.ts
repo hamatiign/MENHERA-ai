@@ -1,19 +1,18 @@
 import * as vscode from 'vscode';
+import { MenheraViewProvider } from './mascotView'; // ▼ 復活させました
 const say = require('say');
-const path = require('path'); // ▼ パス操作のために追加
+const path = require('path');
 
 import {
   GoogleGenerativeAI,
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
-import { MENHERA_PROMPT, /*KEN_PROMPT*/} from "./prompt";
-// import { create } from "domain";
-// import { createHmac } from "crypto";
+import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
-// import { error } from "console";
 
-//ゴーストテキストの表示設定
+// ゴーストテキストの表示設定
+let hasPunished = false;
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   after: {
     margin: "0 0 0 1em",
@@ -24,7 +23,7 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 });
 
-// 型定義（TypeScriptにJSONの中身が文字列の辞書だと教える）
+// 型定義
 const responses: { [key: string]: string } = responsesData;
 
 // -1: 初期状態, 0以上: 前回のエラー数
@@ -33,32 +32,27 @@ let previousErrorCount = -1;
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
 
-  //パネルが開いているかを管理する変数を追加
+  // マスコット表示（サイドバー）
+  const mascotProvider = new MenheraViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(MenheraViewProvider.viewType, mascotProvider)
+  );
+
+  // パネル（ウィンドウ）の状態を管理する変数
   let currentPanel: vscode.WebviewPanel | undefined = undefined;
+  
+  // 診断（赤波線）の監視用タイマー
+  let timeout: NodeJS.Timeout | undefined = undefined;
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
-    if (!editor) {
-      vscode.window.showErrorMessage(
-        "ファイル開いてないじゃん…私のこと無視する気？"
-      );
-      return;
-    }
-    
+    if (!editor) { return; }
+
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
 
     if (!apiKey) {
-      const action = await vscode.window.showErrorMessage(
-        "APIキー設定してないよね？私のこと本気じゃないんだ... (設定を開きますか？)",
-        "設定を開く"
-      );
-      if (action === "設定を開く") {
-        vscode.commands.executeCommand(
-          "workbenchPc.action.openSettings",
-          "menhera-ai.apiKey"
-        );
-      }
-      return;
+       // APIキーがない場合の処理（省略可だが残しておく）
+       return; 
     }
 
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
@@ -66,172 +60,190 @@ export function activate(context: vscode.ExtensionContext) {
       (d) => d.severity === vscode.DiagnosticSeverity.Error
     );
 
-    // エラーが5個以上、かつまだパネルが開いていないなら開く
-    if (errors.length >= 5) {
-      if (!currentPanel) {
-        currentPanel = vscode.window.createWebviewPanel(
-            'menheraAngry',
-            '激怒中',
-            vscode.ViewColumn.Two,
-            {}
-        );
-
-        const onDiskPath = vscode.Uri.file(
-            path.join(context.extensionPath,'images', 'menhela-first-Photoroom.png')
-        );
-        const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
-        
-        // メッセージもここで決める
-        const angryMsg = `エラーこんなにあるじゃん…私のこと嫌いなの？`;
-        currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
-
-        // ユーザーが手動で閉じた時に変数をリセットする
-        currentPanel.onDidDispose(
-            () => {
-            currentPanel = undefined;
-            },
-            null,
-            context.subscriptions
-        );
-        }
-    } else {
-      // エラーが5個未満になったら、パネルがあれば閉じる
-        if (currentPanel) {
-        currentPanel.dispose();
-        currentPanel = undefined;
-        }
-    }
-
-
-
+    // --- エラーが0個（解決済み）の時の処理 ---
     if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
+
+      // パネルが開いていたら閉じる
+      if (currentPanel) {
+        currentPanel.dispose();
+        currentPanel = undefined;
+      }
+      
+      // 画面の色を元に戻す
+      await changeWindowColor(false);
+
+      // 手紙ファイルを削除する処理
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders) {
+          const rootPath = workspaceFolders[0].uri;
+          const fileUri = vscode.Uri.joinPath(rootPath, "私からの手紙.txt");
+
+          try {
+              await vscode.workspace.fs.stat(fileUri);
+              await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+              vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
+              hasPunished = false;
+          } catch (e) {
+              // ファイルがない場合は無視
+          }
+      }
+
       if (previousErrorCount === -1 || previousErrorCount > 0) {
-        vscode.window.showInformationMessage(
-          "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。"
-        );
-        previousErrorCount = 0;
-        return;
+        const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
+        vscode.window.showInformationMessage(msg);
+        mascotProvider.updateMessage(msg);
       }
       previousErrorCount = 0;
       return;
     }
 
-    // 以下エラーがあった場合の処理
+    // --- エラーがある場合の処理 ---
     previousErrorCount = errors.length;
+
+    // ▼ エラー5個以上ならウィンドウを開く
+    if (errors.length >= 5) {
+        if (!currentPanel) {
+            currentPanel = vscode.window.createWebviewPanel(
+                'menheraAngry',
+                '激怒中',
+                vscode.ViewColumn.Two,
+                {}
+            );
+
+            // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
+            const onDiskPath = vscode.Uri.file(
+                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png')
+            );
+            const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
+            
+            const angryMsg = `エラー${errors.length}個もあるじゃん…私のこと嫌いなの？`;
+            currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
+
+            currentPanel.onDidDispose(
+                () => { currentPanel = undefined; },
+                null,
+                context.subscriptions
+            );
+        }
+    } else {
+        // 5個未満になったら閉じる
+        if (currentPanel) {
+            currentPanel.dispose();
+            currentPanel = undefined;
+        }
+    }
+    
+    // ▼ エラー5個以上でお仕置き（手紙作成・画面赤色化）
+    if (errors.length >= 5 && !hasPunished) {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        
+        // 画面を赤くする
+        await changeWindowColor(true);
+
+        if (workspaceFolders) {
+            const rootPath = workspaceFolders[0].uri;
+            const fileName = "私からの手紙.txt";
+            const messageContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
+            const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
+            
+            try {
+                await vscode.workspace.fs.writeFile(newFileUri, new Uint8Array());
+                vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
+                
+                const document = await vscode.workspace.openTextDocument(newFileUri);
+                const letterEditor = await vscode.window.showTextDocument(document, { 
+                    viewColumn: vscode.ViewColumn.Beside, 
+                    preview: false 
+                });
+                
+                typeWriter(letterEditor, messageContent);
+                hasPunished = true; 
+            } catch (error) {
+                console.error("ファイル作成失敗...", error);
+            }
+        }
+    }
+
+    if (errors.length < 3) {
+        hasPunished = false;
+    }
+
+    // ゴーストテキスト（AIメッセージ）の生成と表示
     const DecorationOptions: vscode.DecorationOptions[] = [];
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
-
-      // errors.rangeを使うと、コードの間にテキストが入り込んでしまうため、エラーの行末を指定
-      const EndOfErrorLine = editor.document.lineAt(errors[i].range.start.line)
-        .range.end;
-
+      const EndOfErrorLine = editor.document.lineAt(targetError.range.start.line).range.end;
       const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-      const DecorationOption: vscode.DecorationOptions = {
+      
+      const message = await CreateMessage(targetError, apiKey);
+
+      const decorationOption: vscode.DecorationOptions = {
         range: range,
         renderOptions: {
-          after: {
-            contentText: await CreateMessage(targetError, apiKey),
-          },
+          after: { contentText: message },
         },
-        hoverMessage: await CreateMessage(targetError, apiKey),
+        hoverMessage: message,
       };
 
-      DecorationOptions.push(DecorationOption);
+      DecorationOptions.push(decorationOption);
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
   };
 
-    console.log('メンヘラCopilotが起動しました...ずっと見てるからね…');
+  // helloWorldコマンド（ちぎれていた部分を修復）
+  const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
+    const editor = vscode.window.activeTextEditor;
 
-    const disposable = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
-        
-        const editor = vscode.window.activeTextEditor;
+    if (editor) {
+        // 通常時（ファイルを開いている時）
+        const messages = [
+            'ねぇ、その変数名なに？浮気？',
+            'コード動いたね…でも私の心は動かないよ',
+            'エラー出てないけど、私への愛は足りてる？'
+        ];
+        const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+        vscode.window.showInformationMessage(randomMsg);
+        say.speak(randomMsg, null, 1.0);
+    } else {
+        // エラー時（ファイルを開いていない時）
+        const errorMsg = 'ファイル開いてないじゃん…私のこと無視する気？信じられない...';
+        vscode.window.showErrorMessage(errorMsg);
+        say.speak(errorMsg, null, 1.0);
 
-        if (editor) {
-            // 通常時
-            const messages = [
-                'ねぇ、その変数名なに？浮気？',
-                'コード動いたね…でも私の心は動かないよ',
-                'エラー出てないけど、私への愛は足りてる？'
-            ];
-            const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-            
-            vscode.window.showInformationMessage(randomMsg);
-            say.speak(randomMsg, null, 1.0);
-
-        } else {
-            // --- エラー時（ファイルを開いていない＝無視されている！） ---
-            
-            const errorMsg = 'ファイル開いてないじゃん…私のこと無視する気？信じられない...';
-            
-            // 1. エラーメッセージを出しつつ読み上げ
-            vscode.window.showErrorMessage(errorMsg);
-            say.speak(errorMsg, null, 1.0);
-
-            // 2. ▼ 画像を表示するパネルを作成（ここが追加部分！）
-            const panel = vscode.window.createWebviewPanel(
-                'menheraAngry', // 内部的なID
-                '激怒中',       // タブに表示されるタイトル
-                vscode.ViewColumn.Two, // 右側のカラムに表示（Two）
-                {}
-            );
-
-            // 3. 画像パスをWebview用に変換
-            // ディスク上のパスを取得
-            const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png')
-            );
-            // Webviewで使える形式(vscode-resource:...)に変換
-            const imageUri = panel.webview.asWebviewUri(onDiskPath);
-
-            // 4. HTMLを設定して画像を表示
-            panel.webview.html = getWebviewContent(imageUri, errorMsg);
-        }
-    });
-
-    context.subscriptions.push(disposable);
-
-
- 
-
-  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
-    (event) => {
-      const editor = vscode.window.activeTextEditor;
-      // イベントが起きたファイルが、今開いているファイルと同じなら実行
-      if (
-        editor &&
-        event.uris.some(
-          (uri) => uri.toString() === editor.document.uri.toString()
-        )
-      ) {
-        updateDecorations(editor);
-      }
-        
+        const panel = vscode.window.createWebviewPanel('menheraAngry', '激怒中', vscode.ViewColumn.Two, {});
+        // 画像パス修正
+        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png'));
+        const imageUri = panel.webview.asWebviewUri(onDiskPath);
+        panel.webview.html = getWebviewContent(imageUri, errorMsg);
     }
-  );
+  });
 
-  // 2. 開いているタブ（ファイル）を切り替えた時
-  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(
-    (editor) => {
-      if (editor) {
-        updateDecorations(editor);
+  context.subscriptions.push(helloWorldCommand);
+
+  // 診断変更イベント（デバウンス処理付き）
+  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics((event) => {
+    const editor = vscode.window.activeTextEditor;
+    if (editor && event.uris.some((uri) => uri.toString() === editor.document.uri.toString())) {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = undefined;
       }
+      timeout = setTimeout(() => {
+        updateDecorations(editor);
+      }, 2000); // 2秒後に実行（頻繁なAPI呼び出しを防ぐ）
     }
-  );
+  });
 
   context.subscriptions.push(diagnosticDisposable);
-  context.subscriptions.push(editorChangeDisposable);
 
-  // 3. 起動時に一度だけ実行（すでにファイルを開いている場合用）
   if (vscode.window.activeTextEditor) {
     updateDecorations(vscode.window.activeTextEditor);
   }
 }
 
-// HTMLの中身を作る関数
+// HTML生成関数
 function getWebviewContent(imageUri: vscode.Uri, text: string) {
     return `<!DOCTYPE html>
     <html lang="ja">
@@ -240,7 +252,7 @@ function getWebviewContent(imageUri: vscode.Uri, text: string) {
         <title>激怒</title>
         <style>
             body {
-                background-color: #2b0000; /* 背景を赤黒くして恐怖感を演出 */
+                background-color: #2b0000;
                 color: white;
                 display: flex;
                 flex-direction: column;
@@ -258,6 +270,7 @@ function getWebviewContent(imageUri: vscode.Uri, text: string) {
                 margin-top: 20px;
                 font-family: sans-serif;
                 text-shadow: 2px 2px 4px #000;
+                text-align: center;
             }
         </style>
     </head>
@@ -270,25 +283,51 @@ function getWebviewContent(imageUri: vscode.Uri, text: string) {
 
 export function deactivate() {}
 
+// エラーコード取得用
 const GetJsonKey = (error: vscode.Diagnostic) => {
   const source = error.source ? error.source.toLowerCase() : "unknown";
-
   let codeString = "unknown";
 
-  // 型チェックをして中身を取り出す
   if (typeof error.code === "string" || typeof error.code === "number") {
-    // 文字列か数字なら、そのまま文字列化
     codeString = String(error.code);
   } else if (typeof error.code === "object" && error.code !== null) {
-    // オブジェクトなら、.value の中身を使う
-    codeString = String(error.code?.value);
+    codeString = String((error.code as any).value || "unknown");
   }
 
-  console.log(codeString); // -> "2322" や "no-unused-vars" になる
-  console.log("jsonkey:", `${source}-${codeString}`);
   return `${source}-${codeString}`;
 };
 
+// 画面色変更関数
+const changeWindowColor = async (isAngry: boolean) => {
+    const config = vscode.workspace.getConfiguration();
+    if (isAngry) {
+        await config.update("workbench.colorCustomizations", {
+            "editor.background": "#1a0000",
+            "activityBar.background": "#8b0000",
+            "statusBar.background": "#ff0000",
+            "statusBar.foreground": "#ffffff",
+            "titleBar.activeBackground": "#8b0000"
+        }, vscode.ConfigurationTarget.Workspace);
+    } else {
+        await config.update("workbench.colorCustomizations", undefined, vscode.ConfigurationTarget.Workspace);
+    }
+};
+
+// タイプライター演出関数
+async function typeWriter(editor: vscode.TextEditor, text: string) {
+    for (let i = 0; i < text.length; i++) {
+        if (editor.document.isClosed) { return; }
+        await editor.edit(editBuilder => {
+            const lastLine = editor.document.lineAt(editor.document.lineCount - 1);
+            const endPos = lastLine.range.end;
+            editBuilder.insert(endPos, text[i]);
+        });
+        const randomDelay = Math.floor(Math.random() * 100) + 50;
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
+    }
+}
+
+// AIメッセージ生成関数
 const CreateMessage = async (
   targetError: vscode.Diagnostic,
   apiKey: string
@@ -308,43 +347,19 @@ const CreateMessage = async (
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({
           model: "gemini-flash-latest",
-          // メンヘラ構文が攻撃的だとブロックされるので、セーフティを外す必要がある
           safetySettings: [
-            {
-              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-              threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-              threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-              threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-              threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
           ],
         });
 
-        // AIへの指示（プロンプト）
-        const prompt = `
-                    "${MENHERA_PROMPT}"
-
-                    エラーメッセージ: "${targetError.message}"
-                `;
-
+        const prompt = `${MENHERA_PROMPT}\n\nエラーメッセージ: "${targetError.message}"`;
         const result = await model.generateContent(prompt);
-        const response = result.response.text();
-        return response;
+        return result.response.text().trim();
       } catch (err) {
-        console.error(err);
-        vscode.window.showErrorMessage(
-          "通信エラー...誰と電話してたの？怒るよ？(API Error)"
-        );
-        return "API error";
+        return "通信エラー...誰と電話してたの？(API Error)";
       }
     }
   );
