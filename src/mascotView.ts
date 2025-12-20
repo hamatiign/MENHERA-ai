@@ -1,36 +1,47 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export class MenheraViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'menhera-ai.mascotView';
-    private _view?: vscode.WebviewView;
+  public static readonly viewType = "menhera-ai.mascotView";
+  private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {}
 
-    // VS Codeがビューを表示する準備ができたときに呼ばれる
-    public resolveWebviewView(webviewView: vscode.WebviewView) {
-        this._view = webviewView;
+  // VS Codeがビューを表示する準備ができたときに呼ばれる
+  public resolveWebviewView(webviewView: vscode.WebviewView) {
+    this._view = webviewView;
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this._extensionUri]
-        };
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this._extensionUri],
+    };
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+  }
+
+  // 外部（extension.ts）からメッセージを更新するためのメソッド
+  public updateMessage(message: string) {
+    if (this._view) {
+      this._view.webview.postMessage({ type: "updateText", text: message });
     }
-
-    // 外部（extension.ts）からメッセージを更新するためのメソッド
-    public updateMessage(message: string) {
-        if (this._view) {
-            this._view.webview.postMessage({ type: 'updateText', text: message });
-        }
+  }
+  //外部から激怒モードに変更するメソッド
+  public updateAngryMode(isAngry: boolean) {
+    if (this._view) {
+      this._view.webview.postMessage({ type: "updateAngry", isAngry: isAngry });
     }
+  }
+  private _getHtmlForWebview(webview: vscode.Webview) {
+    // ロゴ画像のパスを取得
+    // const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
+    const menheraUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "src/assets/images",
+        "menhera.png"
+      )
+    );
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
-        // ロゴ画像のパスを取得
-        // const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
-        const menheraUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'src/assets/images', 'menhera.png'));
-
-        return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
         <html lang="ja">
         <head>
             <style>
@@ -47,6 +58,8 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     justify-content:center;
                     padding: 10px;
                 }
+                body.angry .bubble {
+                    color: black !important}
                 .bubble {
                     position: relative;
                     background: #ff69b4;
@@ -84,9 +97,16 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     if (message.type === 'updateText') {
                         messageElement.innerText = message.text;
                     }
+                    if(message.type === 'updateAngry') {
+                        if (message.isAngry) {
+                            document.body.classList.add('angry'); 
+                        } else {
+                            document.body.classList.remove('angry');
+                        }
+                    }
                 });
             </script>
         </body>
         </html>`;
-    }
+  }
 }

@@ -151,6 +151,7 @@ export function activate(context: vscode.ExtensionContext) {
         mascotProvider.updateMessage(msg);
       }
       previousErrorCount = 0;
+      mascotProvider.updateAngryMode(false);
       return;
     }
 
@@ -159,6 +160,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ▼ エラー5個以上ならウィンドウを開く
     if (errors.length >= 5) {
+      mascotProvider.updateAngryMode(true);
       if (!currentPanel) {
         currentPanel = vscode.window.createWebviewPanel(
           "menheraAngry",
@@ -185,6 +187,7 @@ export function activate(context: vscode.ExtensionContext) {
         );
       }
     } else {
+      mascotProvider.updateAngryMode(false);
       // 5個未満になったら閉じる
       if (currentPanel) {
         currentPanel.dispose();
