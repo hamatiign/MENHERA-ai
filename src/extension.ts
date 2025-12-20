@@ -119,26 +119,26 @@ if (errors.length === 0) {
             
             // 作成するファイル名と中身
             const fileName = "私からの手紙.txt";
-            const fileContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
-            
-            // ファイルの保存場所を決める
+            const messageContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
             
             const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
             
-            // 文字を書き込める形式(Uint8Array)に変換
-            const encodedContent = new TextEncoder().encode(fileContent);
-
             try {
                 // ファイルを作成！
-                await vscode.workspace.fs.writeFile(newFileUri, encodedContent);
+                await vscode.workspace.fs.writeFile(newFileUri, new Uint8Array());
                 
                 vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
 
+                // 2. 空のファイルを強制的に開く
                 const document = await vscode.workspace.openTextDocument(newFileUri);
-                await vscode.window.showTextDocument(document, { 
-                    viewColumn: vscode.ViewColumn.Beside, // ★隣の列に開く
-                    preview: false                        // ★プレビューじゃなく確定状態で開く
+                const letterEditor = await vscode.window.showTextDocument(document, { 
+                    viewColumn: vscode.ViewColumn.Beside, // 隣に開く
+                    preview: false 
                 });
+
+                // 3. 開いたエディタに、1文字ずつ書き込んでいく（恐怖演出）
+                // awaitをつけないことで、書き込み中もユーザーは操作できるようにする
+                typeWriter(letterEditor, messageContent);
                 
                 // 「お仕置き済み」にする（これをしないと文字を打つたびにファイルが作られ続ける！）
                 hasPunished = true; 
@@ -299,6 +299,24 @@ const GetJsonKey = (error: vscode.Diagnostic) => {
 
   return `${source}-${codeString}`;
 };
+
+async function typeWriter(editor: vscode.TextEditor, text: string) {
+    for (let i = 0; i < text.length; i++) {
+        // もしユーザーが怖がってファイルを閉じたら、そこで終了
+        if (editor.document.isClosed) { return; }
+
+        await editor.edit(editBuilder => {
+            // いちばん後ろに文字を追加
+            const lastLine = editor.document.lineAt(editor.document.lineCount - 1);
+            const endPos = lastLine.range.end;
+            editBuilder.insert(endPos, text[i]);
+        });
+
+        // 演出：人間っぽく打つために、スピードをランダムに変える（50ms〜150ms）
+        const randomDelay = Math.floor(Math.random() * 100) + 50;
+        await new Promise(resolve => setTimeout(resolve, randomDelay));
+    }
+}
 
 const CreateMessage = async (
   targetError: vscode.Diagnostic,
