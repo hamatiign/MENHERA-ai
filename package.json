@@ -17,6 +17,24 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "menhera-mascot-container",
+          "title": "メンヘラAIマスコット",
+          "icon": "images/menhera_logo.png"
+        }
+      ]
+    },
+    "views": {
+      "menhera-mascot-container": [
+        {
+          "type": "webview",
+          "id": "menhera-ai.mascotView",
+          "name": "メンヘラAI"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "menhera-ai.helloWorld",
@@ -54,8 +72,8 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "dotenv": "^17.2.3",
     "play-sound": "^1.1.6",
-    "say": "^0.16.0",
-    "dotenv": "^17.2.3"
+    "say": "^0.16.0"
   }
 }

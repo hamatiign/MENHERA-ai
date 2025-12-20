@@ -47,6 +47,10 @@ export function activate(context: vscode.ExtensionContext) {
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) { return; }
 
+    if (editor.document.fileName.endsWith("私からの手紙.txt")) {
+        return;
+    }
+
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
 
@@ -113,11 +117,11 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
             const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png')
+                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhera.png')
             );
             const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
             
-            const angryMsg = `エラー${errors.length}個もあるじゃん…私のこと嫌いなの？`;
+            const angryMsg = `エラーこんなにあるじゃん…私のこと嫌いなの？`;
             currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
 
             currentPanel.onDidDispose(
@@ -214,7 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const panel = vscode.window.createWebviewPanel('menheraAngry', '激怒中', vscode.ViewColumn.Two, {});
         // 画像パス修正
-        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png'));
+        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'src', 'assets', 'images', 'menhera.png'));
         const imageUri = panel.webview.asWebviewUri(onDiskPath);
         panel.webview.html = getWebviewContent(imageUri, errorMsg);
     }
