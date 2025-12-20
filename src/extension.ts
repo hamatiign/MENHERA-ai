@@ -178,7 +178,7 @@ if (errors.length === 0) {
         hoverMessage: message,
       };
 
-      DecorationOptions.push(decorationOption);
+      DecorationOptions.push(DecorationOption);
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
