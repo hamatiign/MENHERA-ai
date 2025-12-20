@@ -91,11 +91,25 @@ if (errors.length === 0) {
           const deleteFile = vscode.Uri.joinPath(rootPath, "まだ直さないの.txt");
 
           try {
-              // 2. ファイルが存在するか確認（存在しないとエラーが出てcatchに飛ぶ）
+             // 今開いている全タブの中から「私からの手紙.txt」を探す
+              const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
+              const letterTab = tabs.find(tab => 
+                  tab.input instanceof vscode.TabInputText && 
+                  tab.input.uri.path.endsWith("私からの手紙.txt")
+              );
+              
+              // 見つかったら閉じる
+              if (letterTab) {
+                  await vscode.window.tabGroups.close(letterTab);
+              }
+
+              // 1. まずファイルがあるか確認
               await vscode.workspace.fs.stat(fileUri);
               
-              // 3. 存在したら削除実行！
-              // { useTrash: false } にするとゴミ箱にも入れずに完全消去します（怖い）
+              // 2. 中身を空っぽにする（上書き）
+              await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+              
+              // 3. その後、ファイルを削除する
               await vscode.workspace.fs.delete(fileUri, { useTrash: false });
               
               vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
@@ -136,43 +150,62 @@ if (errors.length === 0) {
     // エラーがあった場合の処理
     previousErrorCount = errors.length;
     
-    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
+    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---}
+    // 💀 お仕置きタイム
     if (errors.length >= 5 && !hasPunished) {
-        // ワークスペース（今開いているフォルダ）の場所を取得
-        const workspaceFolders = vscode.workspace.workspaceFolders;
+        hasPunished = true; // 連打防止フラグ
 
         await changeWindowColor(true);
 
+        const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders) {
-            const rootPath = workspaceFolders[0].uri;
-            
-            // 作成するファイル名と中身
             const fileName = "私からの手紙.txt";
-            const messageContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
+            const messageContent = "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n画面、真っ赤にしちゃった。\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？";
             
-            const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
+            const rootPath = workspaceFolders[0].uri;
+            const fileUri = vscode.Uri.joinPath(rootPath, fileName);
             
             try {
-                // ファイルを作成！
-                await vscode.workspace.fs.writeFile(newFileUri, new Uint8Array());
-                
-                vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
+                vscode.window.showErrorMessage("エラー直してくれないから...ね？");
 
-                // 2. 空のファイルを強制的に開く
-                const document = await vscode.workspace.openTextDocument(newFileUri);
+                // ▼▼▼ 修正のキモ：すでに開いているかチェックする！ ▼▼▼
+                const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
+                
+                let document: vscode.TextDocument;
+
+                if (openedDoc) {
+                    // A. すでに開いているなら、それを使う（勝手にファイルを作らない！）
+                    document = openedDoc;
+                } else {
+                    // B. 開いていないなら、ファイルがあるか確認して、なければ作る
+                    try {
+                        await vscode.workspace.fs.stat(fileUri);
+                    } catch {
+                        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+                    }
+                    document = await vscode.workspace.openTextDocument(fileUri);
+                }
+                // ▲▲▲▲▲▲▲▲▲
+
+                // エディタを表示
                 const letterEditor = await vscode.window.showTextDocument(document, { 
-                    viewColumn: vscode.ViewColumn.Beside, // 隣に開く
+                    viewColumn: vscode.ViewColumn.Beside,
                     preview: false 
                 });
 
-                // 3. 開いたエディタに、1文字ずつ書き込んでいく（恐怖演出）
-                // awaitをつけないことで、書き込み中もユーザーは操作できるようにする
-                typeWriter(letterEditor, messageContent);
+                // 中身を全消し（リセット）
+                await letterEditor.edit(editBuilder => {
+                    const lastLine = document.lineAt(document.lineCount - 1);
+                    const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+                    editBuilder.delete(range);
+                });
+
+                // 書き込み開始
+                await typeWriter(letterEditor, messageContent);
                 
-                // 「お仕置き済み」にする（これをしないと文字を打つたびにファイルが作られ続ける！）
-                hasPunished = true; 
             } catch (error) {
-                console.error("ファイル作成失敗...", error);
+                console.error("お仕置き失敗...", error);
+                hasPunished = false;
             }
         }
     }
@@ -396,6 +429,8 @@ async function typeWriter(editor: vscode.TextEditor, text: string) {
         const randomDelay = Math.floor(Math.random() * 100) + 50;
         await new Promise(resolve => setTimeout(resolve, randomDelay));
     }
+
+    await editor.document.save();
 }
 
 const CreateMessage = async (
