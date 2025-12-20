@@ -11,6 +11,7 @@ import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
 
 // ゴーストテキストの表示設定
+let hasPunished = false;
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   after: {
     margin: "0 0 0 1em",
@@ -65,6 +66,31 @@ export function activate(context: vscode.ExtensionContext) {
 
 if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
+
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      
+      if (workspaceFolders) {
+          const rootPath = workspaceFolders[0].uri;
+          const fileUri = vscode.Uri.joinPath(rootPath, "私からの手紙.txt"); // 消すファイル名
+
+          try {
+              // 2. ファイルが存在するか確認（存在しないとエラーが出てcatchに飛ぶ）
+              await vscode.workspace.fs.stat(fileUri);
+              
+              // 3. 存在したら削除実行！
+              // { useTrash: false } にするとゴミ箱にも入れずに完全消去します（怖い）
+              await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+              
+              vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
+              
+              // フラグもリセット（これでまたエラーが増えたら手紙が作られる）
+              hasPunished = false;
+
+          } catch (e) {
+              // ファイルがもともと無いときは何もしない（スルー）
+          }
+      }
+
       if (previousErrorCount === -1 || previousErrorCount > 0) {
         const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
         vscode.window.showInformationMessage(msg);
@@ -76,7 +102,7 @@ if (errors.length === 0) {
 
     // エラーがあった場合の処理
     previousErrorCount = errors.length;
-    let hasPunished = false;
+    
     // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
     if (errors.length >= 5 && !hasPunished) {
         // ワークスペース（今開いているフォルダ）の場所を取得
