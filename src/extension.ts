@@ -7,11 +7,11 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
-import { MENHERA_PROMPT, KEN_PROMPT } from "./prompt";
-import { create } from "domain";
-import { createHmac } from "crypto";
+import { MENHERA_PROMPT, /*KEN_PROMPT*/} from "./prompt";
+// import { create } from "domain";
+// import { createHmac } from "crypto";
 import responsesData from "./data/responses.json";
-import { error } from "console";
+// import { error } from "console";
 
 //　ゴーストテキストの表示設定
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
@@ -86,7 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
         .range.end;
 
       const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-      const DecolatinoOption: vscode.DecorationOptions = {
+      const DecorationOption: vscode.DecorationOptions = {
         range: range,
         renderOptions: {
           after: {
@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
         hoverMessage: await CreateMessage(targetError, apiKey),
       };
 
-      DecorationOptions.push(DecolatinoOption);
+      DecorationOptions.push(DecorationOption);
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
@@ -167,6 +167,7 @@ export function activate(context: vscode.ExtensionContext) {
       ) {
         updateDecorations(editor);
       }
+        
     }
   );
 
@@ -202,7 +203,7 @@ function getWebviewContent(imageUri: vscode.Uri, text: string) {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                justify_content: center;
+                justify-content: center;
                 height: 100vh;
                 margin: 0;
             }
@@ -288,7 +289,7 @@ const CreateMessage = async (
 
         // AIへの指示（プロンプト）
         const prompt = `
-                    "${KEN_PROMPT}"
+                    "${MENHERA_PROMPT}"
 
                     エラーメッセージ: "${targetError.message}"
                 `;
