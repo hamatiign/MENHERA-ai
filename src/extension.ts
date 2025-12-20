@@ -34,6 +34,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(MenheraViewProvider.viewType, mascotProvider)
     );
 
+  let timeout: NodeJS.Timeout | undefined = undefined;
+
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
       return;
@@ -128,14 +130,27 @@ if (errors.length === 0) {
   // ファイル書き換え（Diagnostics変更）時にAPIを呼び出すイベントリスナー
   const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics((event) => {
     const editor = vscode.window.activeTextEditor;
+    
+    // 変更があったファイルが現在開いているファイルか確認
     if (editor && event.uris.some((uri) => uri.toString() === editor.document.uri.toString())) {
-      updateDecorations(editor);
+      
+      // 既存のタイマーがあればキャンセル（＝前の入力を無かったことにして待ち時間をリセット）
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = undefined;
+      }
+
+      // 新しいタイマーをセット（例: 1000ミリ秒 = 1秒後に実行）
+      timeout = setTimeout(() => {
+        updateDecorations(editor);
+      }, 5000); 
     }
   });
 
-  // タブ切り替え時のリスナー
+  // 2. 開いているタブ（ファイル）を切り替えた時
   const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
     if (editor) {
+      // タブ切り替え時はすぐに表示したいのでデバウンスなし
       updateDecorations(editor);
     }
   });
