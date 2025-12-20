@@ -161,32 +161,37 @@ export function activate(context: vscode.ExtensionContext) {
     // ▼ エラー5個以上ならウィンドウを開く
     if (errors.length >= 5) {
       mascotProvider.updateAngryMode(true);
+      mascotProvider.updateMessage(
+        "エラーこんなにあるじゃん…私のこと嫌いなの？"
+      );
+
       if (!currentPanel) {
-        currentPanel = vscode.window.createWebviewPanel(
-          "menheraAngry",
-          "激怒中",
-          vscode.ViewColumn.Two,
-          {}
-        );
+        // currentPanel = vscode.window.createWebviewPanel(
+        //   "menheraAngry",
+        //   "激怒中",
+        //   vscode.ViewColumn.Two,
+        //   {}
+        // );
 
         // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
-        const onDiskPath = vscode.Uri.file(
-          path.join(context.extensionPath, "images", "menhela-first.png")
-        );
-        const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
+        // const onDiskPath = vscode.Uri.file(
+        //   path.join(context.extensionPath, "images", "menhela-first.png")
+        // );
+      //   const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
 
-        const angryMsg = `"エラーこんなにあるじゃん…私のこと嫌いなの？"`;
-        currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
+      //   const angryMsg = `"エラーこんなにあるじゃん…私のこと嫌いなの？"`;
+      //   currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
 
-        currentPanel.onDidDispose(
-          () => {
-            currentPanel = undefined;
-          },
-          null,
-          context.subscriptions
-        );
+      //   currentPanel.onDidDispose(
+      //     () => {
+      //       currentPanel = undefined;
+      //     },
+      //     null,
+      //     context.subscriptions
+      //   );
       }
-    } else {
+    } 
+    else {
       mascotProvider.updateAngryMode(false);
       // 5個未満になったら閉じる
       if (currentPanel) {
@@ -272,12 +277,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
-    //激怒中は専用メッセージをマスコットへ渡す
-    if (errors.length >= 5) {
-      mascotProvider.updateMessage(
-        "エラーこんなにあるじゃん…私のこと嫌いなの？"
-      );
-    } else if (sidebarMessage) {
+    // 激怒中はそっちでupdateMessageをする
+    if (sidebarMessage && errors.length < 5) {
       mascotProvider.updateMessage(sidebarMessage);
     }
   };
