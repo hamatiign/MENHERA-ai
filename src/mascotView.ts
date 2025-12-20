@@ -27,7 +27,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
 
     private _getHtmlForWebview(webview: vscode.Webview) {
         // ロゴ画像のパスを取得
-        const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', '../src/assets/images/menhera_logo.png'));
+        const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'images/new_menhera_logo.png'));
 
         return `<!DOCTYPE html>
         <html lang="ja">
