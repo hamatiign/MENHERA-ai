@@ -164,6 +164,8 @@ export function activate(context: vscode.ExtensionContext) {
       mascotProvider.updateMessage(
         "エラーこんなにあるじゃん…私のこと嫌いなの？"
       );
+      //サイドバーを開く処理
+      vscode.commands.executeCommand('menhera-ai.mascotView.focus');
 
       if (!currentPanel) {
         // currentPanel = vscode.window.createWebviewPanel(
