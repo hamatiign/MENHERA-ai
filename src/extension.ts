@@ -53,7 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    if (editor.document.fileName.endsWith("私からの手紙.txt")) {
+    if (editor.document.fileName.endsWith("私からの手紙.txt")|| editor.document.fileName.endsWith("まだ直さないの.txt")) {
         return;
     }
 
@@ -288,15 +288,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
-      // 保存されたファイルを表示しているエディタを探して、お仕置きチェックを実行
-      vscode.window.visibleTextEditors.forEach(editor => {
-          if (editor.document.uri.toString() === document.uri.toString()) {
-              updateDecorations(editor);
-          }
-      });
-  });
-  context.subscriptions.push(saveDisposable);
+  // const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
+  //     // 保存されたファイルを表示しているエディタを探して、お仕置きチェックを実行
+  //     vscode.window.visibleTextEditors.forEach(editor => {
+  //         if (editor.document.uri.toString() === document.uri.toString()) {
+  //             updateDecorations(editor);
+  //         }
+  //     });
+  // });
+  // context.subscriptions.push(saveDisposable);
 
   context.subscriptions.push(diagnosticDisposable,);
 
