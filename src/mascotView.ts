@@ -52,9 +52,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
         <html lang="ja">
         <head>
             <style>
-                html {
-                height: 100%;
-                }
+                html { height: 100%; }
                 body {
                     height: 100%;
                     background-color: transparent;
@@ -64,6 +62,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     align-items: center; 
                     justify-content:center;
                     padding: 10px;
+                    overflow: hidden;
                 }
                 body.angry .bubble {
                     color: black !important}
