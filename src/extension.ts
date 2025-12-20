@@ -51,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
       );
       if (action === "設定を開く") {
         vscode.commands.executeCommand(
-          "workbenchPc.action.openSettings",
+          "workbench.action.openSettings",
           "menhera-ai.apiKey"
         );
       }
