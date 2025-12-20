@@ -73,6 +73,8 @@ export function activate(context: vscode.ExtensionContext) {
 if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
 
+      await changeWindowColor(false);
+
       const workspaceFolders = vscode.workspace.workspaceFolders;
       
       if (workspaceFolders) {
@@ -113,7 +115,9 @@ if (errors.length === 0) {
     if (errors.length >= 5 && !hasPunished) {
         // ワークスペース（今開いているフォルダ）の場所を取得
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        
+
+        await changeWindowColor(true);
+
         if (workspaceFolders) {
             const rootPath = workspaceFolders[0].uri;
             
@@ -299,6 +303,23 @@ const GetJsonKey = (error: vscode.Diagnostic) => {
 
   return `${source}-${codeString}`;
 };
+
+const changeWindowColor = async (isAngry: boolean) => {
+    const config = vscode.workspace.getConfiguration();
+    if (isAngry) {
+        // 激怒モード：真っ赤にする
+        await config.update("workbench.colorCustomizations", {
+            "editor.background": "#1a0000",        // エディタ背景：血のような黒赤
+            "activityBar.background": "#8b0000",   // 左のバー：濃い赤
+            "statusBar.background": "#ff0000",     // 下のバー：鮮やかな赤
+            "statusBar.foreground": "#ffffff",
+            "titleBar.activeBackground": "#8b0000" // 上のバー：濃い赤
+        }, vscode.ConfigurationTarget.Workspace);
+    } else {
+        // 許す：設定を削除して元に戻す
+        await config.update("workbench.colorCustomizations", undefined, vscode.ConfigurationTarget.Workspace);
+    }
+  };
 
 async function typeWriter(editor: vscode.TextEditor, text: string) {
     for (let i = 0; i < text.length; i++) {
