@@ -56,8 +56,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     if (
-      editor.document.fileName.endsWith("私からの手紙.txt") ||
-      editor.document.fileName.endsWith("まだ直さないの.txt")
+      editor.document.fileName.endsWith("私からの手紙") ||
+      editor.document.fileName.endsWith("まだ直さないの")
     ) {
       return;
     }
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders) {
         const rootPath = workspaceFolders[0].uri;
-        const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
+        const filesToDelete = ["私からの手紙", "まだ直さないの"];
 
         for (const fileName of filesToDelete) {
           const fileUri = vscode.Uri.joinPath(rootPath, fileName);
@@ -216,7 +216,7 @@ export function activate(context: vscode.ExtensionContext) {
         // 共通関数で手紙を作成
         runPunishmentLogic(
           workspaceFolders,
-          "私からの手紙.txt",
+          "私からの手紙",
           "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？"
         );
       }
@@ -228,7 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
           // 共通関数で追撃ファイルを作成
           await runPunishmentLogic(
             workspaceFolders,
-            "まだ直さないの.txt",
+            "まだ直さないの",
             "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。"
           );
 
