@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    if (editor.document.fileName.endsWith("私からの手紙.txt")) {
+    if (editor.document.fileName.endsWith("私からの手紙.txt")|| editor.document.fileName.endsWith("まだ直さないの.txt")) {
         return;
     }
 
@@ -82,6 +82,13 @@ export function activate(context: vscode.ExtensionContext) {
     // --- エラーが0個（解決済み）の時の処理 ---
     if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
+      await changeWindowColor(false);
+
+      if (stagnationTimeout) {
+          clearTimeout(stagnationTimeout);
+          stagnationTimeout = undefined;
+      }
+
 
       // パネルが開いていたら閉じる
       if (currentPanel) {
@@ -96,51 +103,30 @@ export function activate(context: vscode.ExtensionContext) {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders) {
           const rootPath = workspaceFolders[0].uri;
-          const fileUri = vscode.Uri.joinPath(rootPath, "私からの手紙.txt"); // 消すファイル名
-          const deleteFile = vscode.Uri.joinPath(rootPath, "まだ直さないの.txt");
+          const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
 
-          try {
-             // 今開いている全タブの中から「私からの手紙.txt」を探す
-              const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
-              const letterTab = tabs.find(tab => 
-                  tab.input instanceof vscode.TabInputText && 
-                  tab.input.uri.path.endsWith("私からの手紙.txt")
-              );
-              
-              // 見つかったら閉じる
-              if (letterTab) {
-                  await vscode.window.tabGroups.close(letterTab);
-              }
+          for (const fileName of filesToDelete) {
+              const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+              try {
+                  // タブを閉じる
+                  const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
+                  const targetTab = tabs.find(tab => 
+                      tab.input instanceof vscode.TabInputText && 
+                      tab.input.uri.path.endsWith(fileName)
+                  );
+                  if (targetTab) { await vscode.window.tabGroups.close(targetTab); }
 
-              // 1. まずファイルがあるか確認
-              await vscode.workspace.fs.stat(fileUri);
-              
-              // 2. 中身を空っぽにする（上書き）
-              await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-              
-              // 3. その後、ファイルを削除する
-              await vscode.workspace.fs.delete(fileUri, { useTrash: false });
-              vscode.window.showInformationMessage("あの手紙捨てといたよ！感謝してね。でも次やったら...その時はわかるよね？");
-              hasPunished = false;
-          } catch (e) {
-              // ファイルがない場合は無視
+                  // ファイル削除
+                  await vscode.workspace.fs.stat(fileUri);
+                  await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+              } catch (e) { /* 無視 */ }
           }
 
-          try {
-              // 2. ファイルが存在するか確認（存在しないとエラーが出てcatchに飛ぶ）
-              await vscode.workspace.fs.stat(deleteFile);
-              
-              // 3. 存在したら削除実行！
-              // { useTrash: false } にするとゴミ箱にも入れずに完全消去します（怖い）
-              await vscode.workspace.fs.delete(deleteFile, { useTrash: true });
-              
-              
-              // フラグもリセット（これでまたエラーが増えたら手紙が作られる）
-              hasPunished = false;
-
-          } catch (e) {
-              // ファイルがもともと無いときは何もしない（スルー）
+          if (hasPunished || morePunished) {
+            vscode.window.showInformationMessage("機嫌なおったから、手紙全部捨てといたよ！");
           }
+          hasPunished = false;
+          morePunished = false;
       }
 
       if (previousErrorCount === -1 || previousErrorCount > 0) {
@@ -189,7 +175,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
     
     // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---}
-    // 💀 A. 最初のお仕置き（即時発動）
+// 💀 A. 最初のお仕置き（即時発動）
     if (errors.length >= 5 && !hasPunished) {
         hasPunished = true; // 連打防止
         await changeWindowColor(true);
@@ -241,6 +227,11 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
     }
+                
+                morePunished = true;
+                stagnationTimeout = undefined; // 実行終わったらクリア
+            }, 30000); // 30秒後に発動
+        }
 
     // 💀 B. 追撃タイマー（エラー5個以上のまま放置）
     if (errors.length >= 5) {
@@ -365,7 +356,17 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(diagnosticDisposable);
+  // const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
+  //     // 保存されたファイルを表示しているエディタを探して、お仕置きチェックを実行
+  //     vscode.window.visibleTextEditors.forEach(editor => {
+  //         if (editor.document.uri.toString() === document.uri.toString()) {
+  //             updateDecorations(editor);
+  //         }
+  //     });
+  // });
+  // context.subscriptions.push(saveDisposable);
+
+  context.subscriptions.push(diagnosticDisposable,);
 
   if (vscode.window.activeTextEditor) {
     updateDecorations(vscode.window.activeTextEditor);
@@ -458,7 +459,44 @@ async function typeWriter(editor: vscode.TextEditor, text: string) {
     await editor.document.save();
 }
 
-// AIメッセージ生成関数
+async function runPunishmentLogic(workspaceFolders: readonly vscode.WorkspaceFolder[], fileName: string, content: string) {
+    const rootPath = workspaceFolders[0].uri;
+    const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+    
+    try {
+        // すでに開いているかチェック（競合エラー回避）
+        const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
+        let document: vscode.TextDocument;
+
+        if (openedDoc) {
+            document = openedDoc;
+        } else {
+            try {
+                await vscode.workspace.fs.stat(fileUri);
+            } catch {
+                await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+            }
+            document = await vscode.workspace.openTextDocument(fileUri);
+        }
+
+        const editor = await vscode.window.showTextDocument(document, { 
+            viewColumn: vscode.ViewColumn.Beside,
+            preview: false 
+        });
+
+        // 中身を全消ししてから書く（重複防止）
+        await editor.edit(editBuilder => {
+            const lastLine = document.lineAt(document.lineCount - 1);
+            const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+            editBuilder.delete(range);
+        });
+
+        await typeWriter(editor, content);
+    } catch (e) {
+        console.error("お仕置き失敗", e);
+    }
+}
+
 const CreateMessage = async (
   targetError: vscode.Diagnostic,
   apiKey: string
