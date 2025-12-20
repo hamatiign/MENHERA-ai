@@ -203,7 +203,7 @@ if (errors.length === 0) {
         say.speak(errorMsg, null, 1.0);
 
         const panel = vscode.window.createWebviewPanel('menheraAngry', '激怒中', vscode.ViewColumn.Two, {});
-        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'images', 'images/new_menhera_logo.png'));
+        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'images', 'new_menhera_logo.png'));
         const imageUri = panel.webview.asWebviewUri(onDiskPath);
         panel.webview.html = getWebviewContent(imageUri, errorMsg);
     }
