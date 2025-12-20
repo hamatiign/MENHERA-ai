@@ -13,7 +13,7 @@ import { MENHERA_PROMPT, /*KEN_PROMPT*/} from "./prompt";
 import responsesData from "./data/responses.json";
 // import { error } from "console";
 
-//　ゴーストテキストの表示設定
+//ゴーストテキストの表示設定
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   after: {
     margin: "0 0 0 1em",
@@ -32,6 +32,9 @@ let previousErrorCount = -1;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
+
+  //パネルが開いているかを管理する変数を追加
+  let currentPanel: vscode.WebviewPanel | undefined = undefined;
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
@@ -62,6 +65,45 @@ export function activate(context: vscode.ExtensionContext) {
     const errors = diagnostics.filter(
       (d) => d.severity === vscode.DiagnosticSeverity.Error
     );
+
+    // エラーが5個以上、かつまだパネルが開いていないなら開く
+    if (errors.length >= 5) {
+      if (!currentPanel) {
+        currentPanel = vscode.window.createWebviewPanel(
+            'menheraAngry',
+            '激怒中',
+            vscode.ViewColumn.Two,
+            {}
+        );
+
+        const onDiskPath = vscode.Uri.file(
+            path.join(context.extensionPath,'images', 'menhela-first-Photoroom.png')
+        );
+        const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
+        
+        // メッセージもここで決める
+        const angryMsg = `エラーこんなにあるじゃん…私のこと嫌いなの？`;
+        currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
+
+        // ユーザーが手動で閉じた時に変数をリセットする
+        currentPanel.onDidDispose(
+            () => {
+            currentPanel = undefined;
+            },
+            null,
+            context.subscriptions
+        );
+        }
+    } else {
+      // エラーが5個未満になったら、パネルがあれば閉じる
+        if (currentPanel) {
+        currentPanel.dispose();
+        currentPanel = undefined;
+        }
+    }
+
+
+
     if (errors.length === 0) {
       editor.setDecorations(menheraDecorationType, []);
       if (previousErrorCount === -1 || previousErrorCount > 0) {
@@ -102,7 +144,7 @@ export function activate(context: vscode.ExtensionContext) {
     editor.setDecorations(menheraDecorationType, DecorationOptions);
   };
 
-    console.log('メンヘラCopilotが起動しました...ずっと見てるらね…');
+    console.log('メンヘラCopilotが起動しました...ずっと見てるからね…');
 
     const disposable = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
         
@@ -140,7 +182,7 @@ export function activate(context: vscode.ExtensionContext) {
             // 3. 画像パスをWebview用に変換
             // ディスク上のパスを取得
             const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'images', 'menhela-first.png')
+                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhela-first-Photoroom.png')
             );
             // Webviewで使える形式(vscode-resource:...)に変換
             const imageUri = panel.webview.asWebviewUri(onDiskPath);
