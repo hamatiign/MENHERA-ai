@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
-import { MenheraViewProvider } from './mascotView'; // ▼ 復活させました
-const say = require('say');
+import { MenheraViewProvider } from './mascotView'; 
+
 const path = require('path');
+const { exec } = require('child_process');
+const say = require('say'); 
+
+
 
 import {
   GoogleGenerativeAI,
@@ -163,7 +167,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
             const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'images', 'menhela-first.png')
+                path.join(context.extensionPath,'images', 'menhela-first.png')
             );
             const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
             
@@ -193,10 +197,15 @@ export function activate(context: vscode.ExtensionContext) {
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders) {
+            // 音声再生（連続再生）
+            playAudioSequence(context, ["first-letter-voice-ver2.wav"]);
+
             const fileName = "私からの手紙.txt";
             const messageContent = "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n画面、真っ赤にしちゃった。\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？";
             
+
             const rootPath = workspaceFolders[0].uri;
+
             const fileUri = vscode.Uri.joinPath(rootPath, fileName);
             
             try {
@@ -254,6 +263,8 @@ export function activate(context: vscode.ExtensionContext) {
                     const curseFileName = "まだ直さないの.txt";
                     const curseContent = "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。";
                     const curseFileUri = vscode.Uri.joinPath(rootPath, curseFileName);
+
+                    playAudioSequence(context, ["second-letter-voice.wav"]);
 
                     try {
                         // ファイル作成
@@ -489,3 +500,31 @@ const CreateMessage = async (
     }
   );
 };
+
+// 音声ファイルを連続再生する関数
+async function playAudioSequence(context: vscode.ExtensionContext, fileNames: string[]) {
+    // OSごとの再生コマンド
+    const getCommand = (filePath: string) => {
+        if (process.platform === 'win32') {
+            return `powershell -c (New-Object Media.SoundPlayer "${filePath}").PlaySync()`;
+        } else if (process.platform === 'darwin') {
+            return `afplay "${filePath}"`;
+        } else {
+            return `aplay "${filePath}"`;
+        }
+    };
+
+    // 順番に再生（awaitを使って前の再生が終わるのを待つ）
+    for (const fileName of fileNames) {
+        const filePath = path.join(context.extensionPath, 'audio', fileName);
+        const command = getCommand(filePath);
+
+        await new Promise(resolve => {
+            exec(command, (error: any) => {
+                // エラーがあっても次へ進む
+                if (error) { console.error("再生エラー:", error); }
+                resolve(null);
+            });
+        });
+    }
+}
