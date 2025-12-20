@@ -27,6 +27,7 @@ const responses: { [key: string]: string } = responsesData;
 let previousErrorCount = -1;
 
 export function activate(context: vscode.ExtensionContext) {
+  
   console.log("メンヘラCopilotが起動しました...ずっと見てるからね。");
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
 
@@ -38,8 +39,13 @@ export function activate(context: vscode.ExtensionContext) {
   let timeout: NodeJS.Timeout | undefined = undefined;
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
+ 
     if (!editor) {
       return;
+    }
+
+    if (editor.document.languageId === 'plaintext') {
+        return;
     }
     
     const config = vscode.workspace.getConfiguration("menhera-ai");
@@ -116,6 +122,7 @@ if (errors.length === 0) {
             const fileContent = "ねぇ、エラー多すぎない？\n私のこと大切にしてない証拠だよね。\n\nもう知らない。\n\n反省して直してよ。\n直してくれなきゃ、もっとファイル増やすからね。";
             
             // ファイルの保存場所を決める
+            
             const newFileUri = vscode.Uri.joinPath(rootPath, fileName);
             
             // 文字を書き込める形式(Uint8Array)に変換
@@ -126,6 +133,12 @@ if (errors.length === 0) {
                 await vscode.workspace.fs.writeFile(newFileUri, encodedContent);
                 
                 vscode.window.showErrorMessage("エラーが多すぎるから、手紙書いておいたよ...読んでね。");
+
+                const document = await vscode.workspace.openTextDocument(newFileUri);
+                await vscode.window.showTextDocument(document, { 
+                    viewColumn: vscode.ViewColumn.Beside, // ★隣の列に開く
+                    preview: false                        // ★プレビューじゃなく確定状態で開く
+                });
                 
                 // 「お仕置き済み」にする（これをしないと文字を打つたびにファイルが作られ続ける！）
                 hasPunished = true; 
