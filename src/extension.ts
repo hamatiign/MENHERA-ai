@@ -515,7 +515,6 @@ const CreateMessage = async (
   return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "メンヘラ化中...",
       cancellable: false,
     },
     async () => {
