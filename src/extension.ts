@@ -163,7 +163,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
             const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'src', 'assets', 'images', 'menhera.png')
+                path.join(context.extensionPath, 'images', 'menhela-first.png')
             );
             const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
             
@@ -285,6 +285,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ゴーストテキスト（AIメッセージ）の生成と表示
     const DecorationOptions: vscode.DecorationOptions[] = [];
+
+    let sidebarMessage = "";
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
       const EndOfErrorLine = editor.document.lineAt(targetError.range.start.line).range.end;
