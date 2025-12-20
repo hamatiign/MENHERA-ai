@@ -2,50 +2,34 @@ name: CI
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["**"]
   pull_request:
-    branches: ["main", "master"]
 
 jobs:
   build:
+    runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{HZ matrix.os }}
-
-    # 重要: package.jsonが「menhera-ai」フォルダ内にあるため、作業ディレクトリを指定します。
-    # もしリポジトリのルートにpackage.jsonを移動させた場合は、このdefaultsブロックを削除してください。
-    defaults:
-      run:
-        working-directory: ./menhera-ai
+        node-version: [20.x]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
-          # package.jsonがサブフォルダにある場合、キャッシュのパス指定が必要です
-          cache-dependency-path: menhera-ai/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Lint
-        run: npm run lint
-
       - name: Compile
         run: npm run compile
 
+      - name: Lint
+        run: npm run lint
+
       - name: Run Tests
-        # Linux環境でVS Codeのテストを動かすには xvfb (仮想ディスプレイ) が必要です
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-            xvfb-run -a npm test
-          else
-            npm test
-          fi
-        shell: bash
+        run: xvfb-run -a npm test
