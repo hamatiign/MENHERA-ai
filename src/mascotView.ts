@@ -39,7 +39,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                 }
                 body {
                     height: 100%;
-                    background-color: #0f0f0f;
+                    background-color: transparent;
                     color: #ff8ce0;
                     display: flex; 
                     flex-direction: column; 

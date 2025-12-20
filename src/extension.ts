@@ -425,6 +425,9 @@ const changeWindowColor = async (isAngry: boolean) => {
         "statusBar.background": "#ff0000",
         "statusBar.foreground": "#ffffff",
         "titleBar.activeBackground": "#8b0000",
+        "sideBar.background": "#470000ff",
+        "sideBar.foreground": "#ffffff", // 文字色
+        "sideBarSectionHeader.background": "#8b0000", // ヘッダーの色
       },
       vscode.ConfigurationTarget.Workspace
     );
