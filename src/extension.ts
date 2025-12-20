@@ -174,7 +174,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
     
-    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---}
+    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
 // 💀 A. 最初のお仕置き（即時発動）
     if (errors.length >= 5 && !hasPunished) {
         hasPunished = true; // 連打防止
@@ -228,10 +228,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
                 
-                morePunished = true;
-                stagnationTimeout = undefined; // 実行終わったらクリア
-            }, 30000); // 30秒後に発動
-        }
+               
 
     // 💀 B. 追撃タイマー（エラー5個以上のまま放置）
     if (errors.length >= 5) {
@@ -310,7 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (sidebarMessage) {
       mascotProvider.updateMessage(sidebarMessage);
     }
-  };
+    };
 
   // helloWorldコマンド（ちぎれていた部分を修復）
   const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
@@ -372,6 +369,7 @@ export function activate(context: vscode.ExtensionContext) {
     updateDecorations(vscode.window.activeTextEditor);
   }
 }
+
 
 // HTML生成関数
 function getWebviewContent(imageUri: vscode.Uri, text: string) {
