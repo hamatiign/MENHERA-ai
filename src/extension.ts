@@ -161,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
     // ▼ エラー5個以上ならウィンドウを開く
     if (errors.length >= 5) {
       //サイドバーを開く処理
-      vscode.commands.executeCommand('menhera-ai.mascotView.focus');
+      vscode.commands.executeCommand("menhera-ai.mascotView.focus");
       mascotProvider.updateAngryMode(true);
       mascotProvider.updateMessage(
         "エラーこんなにあるじゃん…私のこと嫌いなの？"
@@ -174,26 +174,22 @@ export function activate(context: vscode.ExtensionContext) {
         //   vscode.ViewColumn.Two,
         //   {}
         // );
-
         // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
         // const onDiskPath = vscode.Uri.file(
         //   path.join(context.extensionPath, "images", "menhela-first.png")
         // );
-      //   const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
-
-      //   const angryMsg = `"エラーこんなにあるじゃん…私のこと嫌いなの？"`;
-      //   currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
-
-      //   currentPanel.onDidDispose(
-      //     () => {
-      //       currentPanel = undefined;
-      //     },
-      //     null,
-      //     context.subscriptions
-      //   );
+        //   const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
+        //   const angryMsg = `"エラーこんなにあるじゃん…私のこと嫌いなの？"`;
+        //   currentPanel.webview.html = getWebviewContent(imageUri, angryMsg);
+        //   currentPanel.onDidDispose(
+        //     () => {
+        //       currentPanel = undefined;
+        //     },
+        //     null,
+        //     context.subscriptions
+        //   );
       }
-    } 
-    else {
+    } else {
       mascotProvider.updateAngryMode(false);
       // 5個未満になったら閉じる
       if (currentPanel) {
@@ -224,6 +220,11 @@ export function activate(context: vscode.ExtensionContext) {
       // B. 追撃タイマー（まだ追撃してなくて、タイマーも動いてなければセット）
       if (!stagnationTimeout && !morePunished && workspaceFolders) {
         stagnationTimeout = setTimeout(async () => {
+          const scaryMessage = glitchText(
+            "ずっと放置してる。信じられない。",
+            0.8
+          );
+          mascotProvider.updateMessage(scaryMessage);
           vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
           // 共通関数で追撃ファイルを作成
           await runPunishmentLogic(
@@ -516,6 +517,43 @@ async function runPunishmentLogic(
   } catch (e) {
     console.error("お仕置き失敗", e);
   }
+}
+
+// 文字列をさらに怖くバグらせる関数
+function glitchText(text: string, level: number): string {
+  // 半角カナ・記号（ノイズ）
+  const noiseChars = "ｱｲｳｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾋﾌﾍﾏﾐﾑﾓﾕﾗﾙﾚﾛｦﾝﾟﾞ#$%&@§†‡";
+
+  // 文字化け漢字（Shift-JIS化け風・不気味な漢字）
+  const curseChars = "縺繧繝繧繧ｪ彁暃轤礒";
+
+  // システム系記号（完全に壊れた感）
+  const systemChars = "NULL";
+
+  return text
+    .split("")
+    .map((char) => {
+      if (char === "\n" || char === " " || char === "　") {
+        return char;
+      }
+
+      if (Math.random() < level) {
+        const type = Math.random();
+
+        if (type < 0.2) {
+          // 40%の確率で「半角カナ・記号」
+          return noiseChars[Math.floor(Math.random() * noiseChars.length)];
+        } else if (type < 0.8) {
+          // 50%の確率で「文字化け漢字」（これが今回ほしいやつ！）
+          return curseChars[Math.floor(Math.random() * curseChars.length)];
+        } else {
+          // 10%の確率で「」や「NULL」
+          return systemChars[Math.floor(Math.random() * systemChars.length)];
+        }
+      }
+      return char;
+    })
+    .join("");
 }
 
 const CreateMessage = async (
