@@ -220,26 +220,31 @@ if (errors.length === 0) {
         timeout = undefined;
       }
 
+
+
       // 新しいタイマーをセット（例: 1000ミリ秒 = 1秒後に実行）
       timeout = setTimeout(() => {
         updateDecorations(editor);
       }, 5000); 
     }
-  });
+  }
+);
 
-  // 2. 開いているタブ（ファイル）を切り替えた時
-  const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    if (editor) {
-      // タブ切り替え時はすぐに表示したいのでデバウンスなし
-      updateDecorations(editor);
-    }
-  });
+  // 2. 開いているタブ（ファイル）を切り替えた時 => タブ切り替えでも何度も走っちゃうので消す（いったんコメントアウトでごまかしてる）
+  // const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
+  //   if (editor) {
+  //     // タブ切り替え時はすぐに表示したいのでデバウンスなし
+  //     updateDecorations(editor);
+  //   }
+  // });
 
-  context.subscriptions.push(diagnosticDisposable, editorChangeDisposable);
+  context.subscriptions.push(diagnosticDisposable,);
 
   if (vscode.window.activeTextEditor) {
     updateDecorations(vscode.window.activeTextEditor);
   }
+
+
 }
 
 // HTMLの中身を作る関数
