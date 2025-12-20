@@ -253,13 +253,15 @@ if (errors.length === 0) {
   }
 );
 
-  // 2. 開いているタブ（ファイル）を切り替えた時 => タブ切り替えでも何度も走っちゃうので消す（いったんコメントアウトでごまかしてる）
-  // const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
-  //   if (editor) {
-  //     // タブ切り替え時はすぐに表示したいのでデバウンスなし
-  //     updateDecorations(editor);
-  //   }
-  // });
+  const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
+      // 保存されたファイルを表示しているエディタを探して、お仕置きチェックを実行
+      vscode.window.visibleTextEditors.forEach(editor => {
+          if (editor.document.uri.toString() === document.uri.toString()) {
+              updateDecorations(editor);
+          }
+      });
+  });
+  context.subscriptions.push(saveDisposable);
 
   context.subscriptions.push(diagnosticDisposable,);
 
