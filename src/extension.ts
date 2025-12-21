@@ -66,7 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     if (!apiKey) {
        // APIキーがない場合の処理（省略可だが残しておく）
-       return; 
+      return; 
     }
 
     if (stagnationTimeout) {
@@ -362,6 +362,19 @@ export function activate(context: vscode.ExtensionContext) {
   //     });
   // });
   // context.subscriptions.push(saveDisposable);
+
+  const changeDocumentDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
+    const editor = vscode.window.activeTextEditor;
+    if (editor && event.document === editor.document) {
+      // Undo (Ctrl+Z) または Redo (Ctrl+Y) が行われた場合
+      if (event.reason === vscode.TextDocumentChangeReason.Undo || event.reason === vscode.TextDocumentChangeReason.Redo) {
+        // いったん装飾を強制的に全消去する
+        editor.setDecorations(menheraDecorationType, []);
+        
+        
+      }
+    }
+  });
 
   context.subscriptions.push(diagnosticDisposable,);
 
