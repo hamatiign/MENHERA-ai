@@ -131,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
             const audioPath = path.join(context.extensionPath, 'audio', 'first-letter-voice-ver2.wav');
             playAudio(audioPath);
             
-            runPunishmentLogic(workspaceFolders, "私からの手紙.txt", "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？"); 
+            runPunishmentLogic(workspaceFolders, "私からの手紙.txt", "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n画面真っ赤にしちゃった...\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？"); 
         }
 
         // B. 追撃タイマー
@@ -276,7 +276,7 @@ async function typeWriter(editor: vscode.TextEditor, text: string) {
             const endPos = lastLine.range.end;
             editBuilder.insert(endPos, text[i]);
         });
-        const randomDelay = Math.floor(Math.random() * 100) + 50;
+        const randomDelay = Math.floor(Math.random() * 175) + 80;
         await new Promise(resolve => setTimeout(resolve, randomDelay));
     }
     await editor.document.save();
