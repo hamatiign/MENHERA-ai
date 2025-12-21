@@ -18,7 +18,21 @@
     "onLanguage:typescript",
     "onLanguage:javascript",
     "onLanguage:typescriptreact",
-    "onLanguage:javascriptreact"
+    "onLanguage:javascriptreact",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:c",
+    "onLanguage:cpp",
+    "onLanguage:csharp",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:php",
+    "onLanguage:ruby",
+    "onLanguage:swift",
+    "onLanguage:dart",
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:json"
   ],
   "main": "./out/extension.js",
   "contributes": {
