@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
-import { MenheraViewProvider } from './mascotView'; // ▼ 復活させました
-const say = require('say');
+import { MenheraViewProvider } from './mascotView'; 
+
 const path = require('path');
+const { exec } = require('child_process');
+const say = require('say'); 
+
+
 
 import {
   GoogleGenerativeAI,
@@ -149,7 +153,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             // 画像パスの修正 (src/assets/images/menhela-first-Photoroom.png)
             const onDiskPath = vscode.Uri.file(
-                path.join(context.extensionPath, 'images', 'menhela-first.png')
+                path.join(context.extensionPath,'images', 'menhela-first.png')
             );
             const imageUri = currentPanel.webview.asWebviewUri(onDiskPath);
             
@@ -170,43 +174,104 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }
     
-    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---}
-    // 💀 お仕置きタイム
-    if (errors.length >= 5) {
+    // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
+// 💀 A. 最初のお仕置き（即時発動）
+    if (errors.length >= 5 && !hasPunished) {
+        hasPunished = true; // 連打防止
+        await changeWindowColor(true);
+
+        // ★追加要素：音声再生（totoroブランチの機能）
+        playAudioSequence(context, ["first-letter-voice-ver2.wav"]);
+
         const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders) {
+            const rootPath = workspaceFolders[0].uri;
+            const fileName = "私からの手紙.txt";
+            const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+            const messageContent = "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n画面、真っ赤にしちゃった。\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？";
 
-        // A. 最初のお仕置き（即時発動）
-        if (!hasPunished && workspaceFolders) {
-            hasPunished = true;
-            await changeWindowColor(true);
-            vscode.window.showErrorMessage("エラー直してくれないから...ね？");
-            
-            // 共通関数で手紙を作成
-            runPunishmentLogic(workspaceFolders, "私からの手紙.txt", "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？"); 
+            try {
+                vscode.window.showErrorMessage("エラー直してくれないから手紙書いておいたよ読んで...ね？");
+
+                // ファイルを開く処理（既存のロジックを維持）
+                const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
+                let document: vscode.TextDocument;
+
+                if (openedDoc) {
+                    document = openedDoc;
+                } else {
+                    try {
+                        await vscode.workspace.fs.stat(fileUri);
+                    } catch {
+                        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+                    }
+                    document = await vscode.workspace.openTextDocument(fileUri);
+                }
+
+                const letterEditor = await vscode.window.showTextDocument(document, { 
+                    viewColumn: vscode.ViewColumn.Beside,
+                    preview: false 
+                });
+
+                // 中身をリセットして書き込み
+                await letterEditor.edit(editBuilder => {
+                    const lastLine = document.lineAt(document.lineCount - 1);
+                    const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+                    editBuilder.delete(range);
+                });
+                await typeWriter(letterEditor, messageContent);
+                
+            } catch (error) {
+                console.error("お仕置き失敗...", error);
+                hasPunished = false;
+            }
         }
+    }
+                
+               
 
-        // B. 追撃タイマー（まだ追撃してなくて、タイマーも動いてなければセット）
-        if (!stagnationTimeout && !morePunished && workspaceFolders) {
+    // 💀 B. 追撃タイマー（エラー5個以上のまま放置）
+    if (errors.length >= 5) {
+        // タイマーが動いておらず、かつまだ追撃していない場合のみセット
+        if (!stagnationTimeout && !morePunished) {
             stagnationTimeout = setTimeout(async () => {
-              vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
-                // 共通関数で追撃ファイルを作成
-                await runPunishmentLogic(workspaceFolders, "まだ直さないの.txt", "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。");
-                
-                
-                morePunished = true;
-                stagnationTimeout = undefined; // 実行終わったらクリア
-            }, 30000); // 30秒後に発動
-        }
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (workspaceFolders) {
+                    const rootPath = workspaceFolders[0].uri;
+                    const curseFileName = "まだ直さないの.txt";
+                    const curseFileUri = vscode.Uri.joinPath(rootPath, curseFileName);
+                    const curseContent = "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。";
 
+                    // ★追加要素：追撃の音声再生
+                    playAudioSequence(context, ["second-letter-voice.wav"]);
+
+                    try {
+                        vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
+                        
+                        // ファイル作成・オープン処理
+                        await vscode.workspace.fs.writeFile(curseFileUri, new Uint8Array());
+                        const doc = await vscode.workspace.openTextDocument(curseFileUri);
+                        const noFixLetter = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+                        
+                        await typeWriter(noFixLetter, curseContent);
+
+                        morePunished = true; // 追撃済みフラグON
+                        stagnationTimeout = undefined; // タイマークリア
+
+                    } catch (e) {
+                        console.error("追撃失敗", e);
+                    }
+                }
+            }, 30000); // 30秒後に実行
+        }
     } else {
-        // エラーが5個未満になったら、追撃タイマーは解除してあげる
+        // エラーが5個未満になったら、カウントダウンを解除してあげる
         if (stagnationTimeout) {
             clearTimeout(stagnationTimeout);
             stagnationTimeout = undefined;
         }
     }
-
-    // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
+        // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
     if (errors.length < 3) {
         hasPunished = false;
         morePunished = false;
@@ -242,7 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
     if (sidebarMessage) {
       mascotProvider.updateMessage(sidebarMessage);
     }
-  };
+    };
 
   // helloWorldコマンド（ちぎれていた部分を修復）
   const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
@@ -304,6 +369,7 @@ export function activate(context: vscode.ExtensionContext) {
     updateDecorations(vscode.window.activeTextEditor);
   }
 }
+
 
 // HTML生成関数
 function getWebviewContent(imageUri: vscode.Uri, text: string) {
@@ -465,3 +531,31 @@ const CreateMessage = async (
     }
   );
 };
+
+// 音声ファイルを連続再生する関数
+async function playAudioSequence(context: vscode.ExtensionContext, fileNames: string[]) {
+    // OSごとの再生コマンド
+    const getCommand = (filePath: string) => {
+        if (process.platform === 'win32') {
+            return `powershell -c (New-Object Media.SoundPlayer "${filePath}").PlaySync()`;
+        } else if (process.platform === 'darwin') {
+            return `afplay "${filePath}"`;
+        } else {
+            return `aplay "${filePath}"`;
+        }
+    };
+
+    // 順番に再生（awaitを使って前の再生が終わるのを待つ）
+    for (const fileName of fileNames) {
+        const filePath = path.join(context.extensionPath, 'audio', fileName);
+        const command = getCommand(filePath);
+
+        await new Promise(resolve => {
+            exec(command, (error: any) => {
+                // エラーがあっても次へ進む
+                if (error) { console.error("再生エラー:", error); }
+                resolve(null);
+            });
+        });
+    }
+}
