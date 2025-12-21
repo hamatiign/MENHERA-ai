@@ -42,23 +42,28 @@ export function activate(context: vscode.ExtensionContext) {
   // マスコット表示（サイドバー）
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(MenheraViewProvider.viewType, mascotProvider)
+    vscode.window.registerWebviewViewProvider(
+      MenheraViewProvider.viewType,
+      mascotProvider
+    )
   );
 
   // パネル（ウィンドウ）の状態を管理する変数
   let currentPanel: vscode.WebviewPanel | undefined = undefined;
-  
+
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
-
     if (!editor) {
       return;
     }
 
-    if (editor.document.fileName.endsWith("私からの手紙.txt")|| editor.document.fileName.endsWith("まだ直さないの.txt")) {
-        return;
+    if (
+      editor.document.fileName.endsWith("私からの手紙") ||
+      editor.document.fileName.endsWith("まだ直さないの")
+    ) {
+      return;
     }
 
     const config = vscode.workspace.getConfiguration("menhera-ai");
@@ -70,14 +75,21 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     if (stagnationTimeout) {
-            clearTimeout(stagnationTimeout);
-            stagnationTimeout = undefined;
-        }
+      clearTimeout(stagnationTimeout);
+      stagnationTimeout = undefined;
+    }
 
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-    const errors = diagnostics.filter(
+    let errors = diagnostics.filter(
       (d) => d.severity === vscode.DiagnosticSeverity.Error
     );
+
+    errors = errors.filter((error, index, self) => {
+      if (index === 0) {
+        return true;
+      }
+      return error.range.start.line !== self[index - 1].range.start.line;
+    });
 
     // --- エラーが0個（解決済み）の時の処理 ---
     if (errors.length === 0) {
@@ -85,48 +97,56 @@ export function activate(context: vscode.ExtensionContext) {
       await changeWindowColor(false);
 
       if (stagnationTimeout) {
-          clearTimeout(stagnationTimeout);
-          stagnationTimeout = undefined;
+        clearTimeout(stagnationTimeout);
+        stagnationTimeout = undefined;
       }
-
 
       // パネルが開いていたら閉じる
       if (currentPanel) {
         currentPanel.dispose();
         currentPanel = undefined;
       }
-      
+
       // 画面の色を元に戻す
       await changeWindowColor(false);
 
       // 手紙ファイルを削除する処理
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders) {
-          const rootPath = workspaceFolders[0].uri;
-          const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
+        const rootPath = workspaceFolders[0].uri;
+        const filesToDelete = ["私からの手紙", "まだ直さないの"];
 
-          for (const fileName of filesToDelete) {
-              const fileUri = vscode.Uri.joinPath(rootPath, fileName);
-              try {
-                  // タブを閉じる
-                  const tabs = vscode.window.tabGroups.all.map(tg => tg.tabs).flat();
-                  const targetTab = tabs.find(tab => 
-                      tab.input instanceof vscode.TabInputText && 
-                      tab.input.uri.path.endsWith(fileName)
-                  );
-                  if (targetTab) { await vscode.window.tabGroups.close(targetTab); }
+        for (const fileName of filesToDelete) {
+          const fileUri = vscode.Uri.joinPath(rootPath, fileName);
+          try {
+            // タブを閉じる
+            const tabs = vscode.window.tabGroups.all
+              .map((tg) => tg.tabs)
+              .flat();
+            const targetTab = tabs.find(
+              (tab) =>
+                tab.input instanceof vscode.TabInputText &&
+                tab.input.uri.path.endsWith(fileName)
+            );
+            if (targetTab) {
+              await vscode.window.tabGroups.close(targetTab);
+            }
 
-                  // ファイル削除
-                  await vscode.workspace.fs.stat(fileUri);
-                  await vscode.workspace.fs.delete(fileUri, { useTrash: false });
-              } catch (e) { /* 無視 */ }
+            // ファイル削除
+            await vscode.workspace.fs.stat(fileUri);
+            await vscode.workspace.fs.delete(fileUri, { useTrash: false });
+          } catch (e) {
+            /* 無視 */
           }
+        }
 
-          if (hasPunished || morePunished) {
-            vscode.window.showInformationMessage("機嫌なおったから、手紙全部捨てといたよ！");
-          }
-          hasPunished = false;
-          morePunished = false;
+        if (hasPunished || morePunished) {
+          vscode.window.showInformationMessage(
+            "機嫌なおったから、手紙全部捨てといたよ！"
+          );
+        }
+        hasPunished = false;
+        morePunished = false;
       }
 
       if (previousErrorCount === -1 || previousErrorCount > 0) {
@@ -135,6 +155,7 @@ export function activate(context: vscode.ExtensionContext) {
         mascotProvider.updateMessage(msg);
       }
       previousErrorCount = 0;
+      mascotProvider.updateAngryMode(false);
       return;
     }
 
@@ -167,11 +188,12 @@ export function activate(context: vscode.ExtensionContext) {
             );
         }
     } else {
-        // 5個未満になったら閉じる
-        if (currentPanel) {
-            currentPanel.dispose();
-            currentPanel = undefined;
-        }
+      mascotProvider.updateAngryMode(false);
+      // 5個未満になったら閉じる
+      if (currentPanel) {
+        currentPanel.dispose();
+        currentPanel = undefined;
+      }
     }
     
     // --- 2. ここに追加！「エラー5個以上でお仕置き」ロジック ---
@@ -273,8 +295,8 @@ export function activate(context: vscode.ExtensionContext) {
     }
         // エラーが減ったら（例えば3個以下になったら）許してあげる（フラグをリセット）
     if (errors.length < 3) {
-        hasPunished = false;
-        morePunished = false;
+      hasPunished = false;
+      morePunished = false;
     }
 
     // ゴーストテキスト（AIメッセージ）の生成と表示
@@ -283,9 +305,11 @@ export function activate(context: vscode.ExtensionContext) {
     let sidebarMessage = "";
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
-      const EndOfErrorLine = editor.document.lineAt(targetError.range.start.line).range.end;
+      const EndOfErrorLine = editor.document.lineAt(
+        targetError.range.start.line
+      ).range.end;
       const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-      
+
       const message = await CreateMessage(targetError, apiKey);
 
       if (i === 0) {
@@ -304,54 +328,79 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
-    if (sidebarMessage) {
+    // 激怒中はそっちでupdateMessageをする
+    if (sidebarMessage && errors.length < 5) {
       mascotProvider.updateMessage(sidebarMessage);
     }
     };
 
   // helloWorldコマンド（ちぎれていた部分を修復）
-  const helloWorldCommand = vscode.commands.registerCommand('menhera-ai.helloWorld', () => {
-    const editor = vscode.window.activeTextEditor;
+  const helloWorldCommand = vscode.commands.registerCommand(
+    "menhera-ai.helloWorld",
+    () => {
+      const editor = vscode.window.activeTextEditor;
 
-    if (editor) {
+      if (editor) {
         // 通常時（ファイルを開いている時）
         const messages = [
-            'ねぇ、その変数名なに？浮気？',
-            'コード動いたね…でも私の心は動かないよ',
-            'エラー出てないけど、私への愛は足りてる？'
+          "ねぇ、その変数名なに？浮気？",
+          "コード動いたね…でも私の心は動かないよ",
+          "エラー出てないけど、私への愛は足りてる？",
         ];
         const randomMsg = messages[Math.floor(Math.random() * messages.length)];
         vscode.window.showInformationMessage(randomMsg);
         say.speak(randomMsg, null, 1.0);
-    } else {
+      } else {
         // エラー時（ファイルを開いていない時）
-        const errorMsg = 'ファイル開いてないじゃん…私のこと無視する気？信じられない...';
+        const errorMsg =
+          "ファイル開いてないじゃん…私のこと無視する気？信じられない...";
         vscode.window.showErrorMessage(errorMsg);
         say.speak(errorMsg, null, 1.0);
 
-        const panel = vscode.window.createWebviewPanel('menheraAngry', '激怒中', vscode.ViewColumn.Two, {});
+        const panel = vscode.window.createWebviewPanel(
+          "menheraAngry",
+          "激怒中",
+          vscode.ViewColumn.Two,
+          {}
+        );
         // 画像パス修正
-        const onDiskPath = vscode.Uri.file(path.join(context.extensionPath, 'src', 'assets', 'images', 'menhera.png'));
+        const onDiskPath = vscode.Uri.file(
+          path.join(
+            context.extensionPath,
+            "src",
+            "assets",
+            "images",
+            "menhera.png"
+          )
+        );
         const imageUri = panel.webview.asWebviewUri(onDiskPath);
         panel.webview.html = getWebviewContent(imageUri, errorMsg);
+      }
     }
-  });
+  );
 
   context.subscriptions.push(helloWorldCommand);
 
   // 診断変更イベント（デバウンス処理付き）
-  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics((event) => {
-    const editor = vscode.window.activeTextEditor;
-    if (editor && event.uris.some((uri) => uri.toString() === editor.document.uri.toString())) {
-      if (timeout) {
-        clearTimeout(timeout);
-        timeout = undefined;
+  const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
+    (event) => {
+      const editor = vscode.window.activeTextEditor;
+      if (
+        editor &&
+        event.uris.some(
+          (uri) => uri.toString() === editor.document.uri.toString()
+        )
+      ) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = undefined;
+        }
+        timeout = setTimeout(() => {
+          updateDecorations(editor);
+        }, 2000); // 2秒後に実行（頻繁なAPI呼び出しを防ぐ）
       }
-      timeout = setTimeout(() => {
-        updateDecorations(editor);
-      }, 2000); // 2秒後に実行（頻繁なAPI呼び出しを防ぐ）
     }
-  });
+  );
 
   // const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
   //     // 保存されたファイルを表示しているエディタを探して、お仕置きチェックを実行
@@ -386,7 +435,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 // HTML生成関数
 function getWebviewContent(imageUri: vscode.Uri, text: string) {
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
     <html lang="ja">
     <head>
         <meta charset="UTF-8">
@@ -440,72 +489,133 @@ const GetJsonKey = (error: vscode.Diagnostic) => {
 
 // 画面色変更関数
 const changeWindowColor = async (isAngry: boolean) => {
-    const config = vscode.workspace.getConfiguration();
-    if (isAngry) {
-        await config.update("workbench.colorCustomizations", {
-            "editor.background": "#1a0000",
-            "activityBar.background": "#8b0000",
-            "statusBar.background": "#ff0000",
-            "statusBar.foreground": "#ffffff",
-            "titleBar.activeBackground": "#8b0000"
-        }, vscode.ConfigurationTarget.Workspace);
-    } else {
-        await config.update("workbench.colorCustomizations", undefined, vscode.ConfigurationTarget.Workspace);
-    }
+  const config = vscode.workspace.getConfiguration();
+  if (isAngry) {
+    await config.update(
+      "workbench.colorCustomizations",
+      {
+        "editor.background": "#1a0000",
+        "activityBar.background": "#8b0000",
+        "statusBar.background": "#ff0000",
+        "statusBar.foreground": "#ffffff",
+        "titleBar.activeBackground": "#8b0000",
+        "sideBar.background": "#470000ff",
+        "sideBar.foreground": "#ffffff", // 文字色
+        "sideBarSectionHeader.background": "#8b0000", // ヘッダーの色
+      },
+      vscode.ConfigurationTarget.Workspace
+    );
+  } else {
+    await config.update(
+      "workbench.colorCustomizations",
+      undefined,
+      vscode.ConfigurationTarget.Workspace
+    );
+  }
 };
 
 // タイプライター演出関数
 async function typeWriter(editor: vscode.TextEditor, text: string) {
-    for (let i = 0; i < text.length; i++) {
-        if (editor.document.isClosed) { return; }
-        await editor.edit(editBuilder => {
-            const lastLine = editor.document.lineAt(editor.document.lineCount - 1);
-            const endPos = lastLine.range.end;
-            editBuilder.insert(endPos, text[i]);
-        });
-        const randomDelay = Math.floor(Math.random() * 100) + 50;
-        await new Promise(resolve => setTimeout(resolve, randomDelay));
+  for (let i = 0; i < text.length; i++) {
+    if (editor.document.isClosed) {
+      return;
     }
+    await editor.edit((editBuilder) => {
+      const lastLine = editor.document.lineAt(editor.document.lineCount - 1);
+      const endPos = lastLine.range.end;
+      editBuilder.insert(endPos, text[i]);
+    });
+    const randomDelay = Math.floor(Math.random() * 100) + 50;
+    await new Promise((resolve) => setTimeout(resolve, randomDelay));
+  }
 
-    await editor.document.save();
+  await editor.document.save();
 }
 
-async function runPunishmentLogic(workspaceFolders: readonly vscode.WorkspaceFolder[], fileName: string, content: string) {
-    const rootPath = workspaceFolders[0].uri;
-    const fileUri = vscode.Uri.joinPath(rootPath, fileName);
-    
-    try {
-        // すでに開いているかチェック（競合エラー回避）
-        const openedDoc = vscode.workspace.textDocuments.find(d => d.uri.toString() === fileUri.toString());
-        let document: vscode.TextDocument;
+async function runPunishmentLogic(
+  workspaceFolders: readonly vscode.WorkspaceFolder[],
+  fileName: string,
+  content: string
+) {
+  const rootPath = workspaceFolders[0].uri;
+  const fileUri = vscode.Uri.joinPath(rootPath, fileName);
 
-        if (openedDoc) {
-            document = openedDoc;
-        } else {
-            try {
-                await vscode.workspace.fs.stat(fileUri);
-            } catch {
-                await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
-            }
-            document = await vscode.workspace.openTextDocument(fileUri);
-        }
+  try {
+    // すでに開いているかチェック（競合エラー回避）
+    const openedDoc = vscode.workspace.textDocuments.find(
+      (d) => d.uri.toString() === fileUri.toString()
+    );
+    let document: vscode.TextDocument;
 
-        const editor = await vscode.window.showTextDocument(document, { 
-            viewColumn: vscode.ViewColumn.Beside,
-            preview: false 
-        });
-
-        // 中身を全消ししてから書く（重複防止）
-        await editor.edit(editBuilder => {
-            const lastLine = document.lineAt(document.lineCount - 1);
-            const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
-            editBuilder.delete(range);
-        });
-
-        await typeWriter(editor, content);
-    } catch (e) {
-        console.error("お仕置き失敗", e);
+    if (openedDoc) {
+      document = openedDoc;
+    } else {
+      try {
+        await vscode.workspace.fs.stat(fileUri);
+      } catch {
+        await vscode.workspace.fs.writeFile(fileUri, new Uint8Array());
+      }
+      document = await vscode.workspace.openTextDocument(fileUri);
     }
+
+    const editor = await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Beside,
+      preview: false,
+    });
+
+    // 中身を全消ししてから書く（重複防止）
+    await editor.edit((editBuilder) => {
+      const lastLine = document.lineAt(document.lineCount - 1);
+      const range = new vscode.Range(
+        0,
+        0,
+        lastLine.range.end.line,
+        lastLine.range.end.character
+      );
+      editBuilder.delete(range);
+    });
+
+    await typeWriter(editor, content);
+  } catch (e) {
+    console.error("お仕置き失敗", e);
+  }
+}
+
+// 文字列をさらに怖くバグらせる関数
+function glitchText(text: string, level: number): string {
+  // 半角カナ・記号（ノイズ）
+  const noiseChars = "ｱｲｳｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾋﾌﾍﾏﾐﾑﾓﾕﾗﾙﾚﾛｦﾝﾟﾞ#$%&@§†‡";
+
+  // 文字化け漢字（Shift-JIS化け風・不気味な漢字）
+  const curseChars = "縺繧繝繧繧ｪ彁暃轤礒";
+
+  // システム系記号（完全に壊れた感）
+  const systemChars = "NULL";
+
+  return text
+    .split("")
+    .map((char) => {
+      if (char === "\n" || char === " " || char === "　") {
+        return char;
+      }
+
+      if (Math.random() < level) {
+        const type = Math.random();
+
+        if (type < 0.2) {
+          // 40%の確率で「半角カナ・記号」
+          return noiseChars[Math.floor(Math.random() * noiseChars.length)];
+        } else if (type < 0.8) {
+          // 50%の確率で「文字化け漢字」（これが今回ほしいやつ！）
+          return curseChars[Math.floor(Math.random() * curseChars.length)];
+        } else {
+          // 10%の確率で「」や「NULL」
+          return systemChars[Math.floor(Math.random() * systemChars.length)];
+        }
+      }
+      return char;
+    })
+    .join("");
 }
 
 const CreateMessage = async (
@@ -519,7 +629,6 @@ const CreateMessage = async (
   return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: "メンヘラ化中...",
       cancellable: false,
     },
     async () => {
@@ -528,10 +637,22 @@ const CreateMessage = async (
         const model = genAI.getGenerativeModel({
           model: "gemini-flash-latest",
           safetySettings: [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            {
+              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
+            {
+              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+              threshold: HarmBlockThreshold.BLOCK_NONE,
+            },
           ],
         });
 

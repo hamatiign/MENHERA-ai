@@ -1,46 +1,71 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 export class MenheraViewProvider implements vscode.WebviewViewProvider {
-    public static readonly viewType = 'menhera-ai.mascotView';
-    private _view?: vscode.WebviewView;
+  public static readonly viewType = "menhera-ai.mascotView";
+  private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {}
 
-    // VS Codeがビューを表示する準備ができたときに呼ばれる
-    public resolveWebviewView(webviewView: vscode.WebviewView) {
-        this._view = webviewView;
+  // VS Codeがビューを表示する準備ができたときに呼ばれる
+  public resolveWebviewView(webviewView: vscode.WebviewView) {
+    this._view = webviewView;
 
-        webviewView.webview.options = {
-            enableScripts: true,
-            localResourceRoots: [this._extensionUri]
-        };
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this._extensionUri],
+    };
 
-        webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+  }
+
+  // 外部（extension.ts）からメッセージを更新するためのメソッド
+  public updateMessage(message: string) {
+    if (this._view) {
+      this._view.webview.postMessage({ type: "updateText", text: message });
     }
-
-    // 外部（extension.ts）からメッセージを更新するためのメソッド
-    public updateMessage(message: string) {
-        if (this._view) {
-            this._view.webview.postMessage({ type: 'updateText', text: message });
-        }
+  }
+  //外部から激怒モードに変更するメソッド
+  public updateAngryMode(isAngry: boolean) {
+    if (this._view) {
+      this._view.webview.postMessage({ type: "updateAngry", isAngry: isAngry });
     }
+  }
+  private _getHtmlForWebview(webview: vscode.Webview) {
+    // ロゴ画像のパスを取得
+      const logoUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "images",
+        "new_menhera_logo.png"
+      )
+    );
+    // const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
+    const angryUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this._extensionUri,
+        "src/assets/images",
+        "menhera.png"
+      )
+    );
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
-        // ロゴ画像のパスを取得
-        const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
-
-        return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
         <html lang="ja">
         <head>
             <style>
+                html { height: 100%; }
                 body {
-                    background-color: #0f0f0f;
+                    height: 100%;
+                    background-color: transparent;
                     color: #ff8ce0;
                     display: flex; 
                     flex-direction: column; 
                     align-items: center; 
+                    justify-content:center;
                     padding: 10px;
+                    overflow: hidden;
                 }
+                body.angry .bubble {
+                    color: black !important}
                 .bubble {
                     position: relative;
                     background: #ff69b4;
@@ -64,22 +89,40 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
                     border-color: #ff69b4 transparent;
                     transform: translateX(-50%);
                 }
-                .logo { width: 100px; height: auto; }
+                
+                .mascot-image { width: auto; height: auto;}
+                
             </style>
         </head>
         <body>
             <div id="message" class="bubble">ねぇ、ずっとコード書いてるね。私のことも見てよ...</div>
-            <img class="logo" src="${logoUri}">
+            <img class="mascot-image" id="mascot-image" src="${logoUri}">
             <script>
                 const messageElement = document.getElementById('message');
+                const imageElement = document.getElementById('mascot-image');
+
+                const logoImgSrc = "${logoUri}";
+                const angryImgSrc = "${angryUri}";
+
                 window.addEventListener('message', event => {
                     const message = event.data;
                     if (message.type === 'updateText') {
                         messageElement.innerText = message.text;
                     }
+                    if(message.type === 'updateAngry') {
+                        if (message.isAngry) {
+                            document.body.classList.add('angry'); 
+                            imageElement.src = angryImgSrc;
+                        } else {
+                            document.body.classList.remove('angry');
+                            
+                          imageElement.src = logoImgSrc;
+                        }
+
+                    }
                 });
             </script>
         </body>
         </html>`;
-    }
+  }
 }
