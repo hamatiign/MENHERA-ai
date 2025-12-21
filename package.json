@@ -32,7 +32,8 @@
         {
           "type": "webview",
           "id": "menhera-ai.mascotView",
-          "name": "メンヘラAI"
+          "name": "メンヘラAI",
+          "icon": "images/new_menhera_logo.svg"
         }
       ]
     },

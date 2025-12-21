@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/new_menhera_logo.png" alt="Menhera AI Logo" width="200"/>
+  <img src="images/new_menhera_logo.svg" alt="Menhera AI Logo" width="200"/>
 </p>
 
 <h1 align="center">Menhera AI (メンヘラAI)</h1>
