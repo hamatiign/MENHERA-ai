@@ -4,6 +4,11 @@
   "description": "コードのエラー文をメンヘラにするVSコードの拡張機能",
   "version": "0.0.1",
   "publisher": "rui319420",
+  "icon": "images/new_menhera_logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hamatiign/MENHERA-ai"
+  },
   "engines": {
     "vscode": "^1.107.0"
   },
