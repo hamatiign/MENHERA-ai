@@ -12,6 +12,13 @@ import {
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
 
+// --- 起動時刻とタイマー設定（ネスト指摘用） ---
+const startupTime = Date.now();
+const STARTUP_GRACE_PERIOD = 60 * 1000; // 起動後5分間はネストについて言わない
+
+let lastNestingComplaintTime = 0;
+const NESTING_COOLDOWN = 10 * 60 * 1000; // チェック間隔（10分間は静かにする）
+
 // ゴーストテキストの表示設定
 let hasPunished = false;
 const menheraDecorationType = vscode.window.createTextEditorDecorationType({
@@ -71,6 +78,8 @@ export function activate(context: vscode.ExtensionContext) {
       (d) => d.severity === vscode.DiagnosticSeverity.Error,
     );
 
+// extension.ts の 81行目付近から始まる if文ブロックを書き換え
+
     // ==========================================
     // 🧹 1. エラーがない時（お掃除＆ご機嫌タイム）
     // ==========================================
@@ -101,6 +110,28 @@ export function activate(context: vscode.ExtensionContext) {
         hasPunished = false;
         morePunished = false;
       }
+
+      const now = Date.now();
+      
+      // 条件: 「起動直後ではない」 かつ 「前回の指摘から時間が経っている」 場合のみチェック
+      if ((now - startupTime) >= STARTUP_GRACE_PERIOD && (now - lastNestingComplaintTime) >= NESTING_COOLDOWN) {
+          
+          // ヘルパー関数で深さを計測
+          const maxDepth = checkNestingLevel(editor.document);
+          const nestLimit = 5; // 5階層以上で指摘
+
+          if (maxDepth >= nestLimit) {
+              const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
+              mascotProvider.updateMessage(msg);
+              
+              // ネストのチェックの時間を更新し、しばらくは静かにさせる
+              lastNestingComplaintTime = now;
+              
+              return; 
+          }
+      }
+      // ---------------------------------------------------------
+
       if (previousErrorCount === -1 || previousErrorCount > 0) {
         const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
         vscode.window.showInformationMessage(msg);
@@ -108,7 +139,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
       previousErrorCount = 0;
       return;
-}
+    }
 
     // --- エラーがある場合の処理 ---
     previousErrorCount = errors.length;
@@ -476,4 +507,32 @@ function playAudio(filePath: string) {
       if (error) console.error("再生エラー:", error);
     });
   }
+}
+
+// ネストの深さをチェックする関数
+function checkNestingLevel(document: vscode.TextDocument): number {
+  let maxDepth = 0;
+  
+  for (let i = 0; i < document.lineCount; i++) {
+    const line = document.lineAt(i);
+    const text = line.text;
+
+    // 空行やコメント行(//)は無視
+    if (text.trim() === "" || text.trim().startsWith("//")) {
+        continue; 
+    }
+
+    // 行頭の空白文字を取得
+    const indentMatch = text.match(/^(\s*)/);
+    const indentLength = indentMatch ? indentMatch[1].length : 0;
+
+    // スペース4つ（またはタブ1つ）を1階層として計算
+    // ※スペース2つで1階層の環境なら / 2 に変更してください
+    const currentDepth = Math.floor(indentLength / 4); 
+
+    if (currentDepth > maxDepth) {
+      maxDepth = currentDepth;
+    }
+  }
+  return maxDepth;
 }
