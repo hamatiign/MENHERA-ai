@@ -24,6 +24,8 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 });
 
+const hoverDecorationType = vscode.window.createTextEditorDecorationType({});
+
 const responses: { [key: string]: string } = responsesData;
 let previousErrorCount = -1;
 let morePunished = false;
@@ -106,7 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
       previousErrorCount = 0;
       return;
-    }
+}
 
     // --- エラーがある場合の処理 ---
     previousErrorCount = errors.length;
@@ -182,6 +184,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ゴーストテキスト表示
     const DecorationOptions: vscode.DecorationOptions[] = [];
+    const hoverOptions: vscode.DecorationOptions[] = [];
+    
     let sidebarMessage = "";
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
@@ -195,6 +199,11 @@ export function activate(context: vscode.ExtensionContext) {
         sidebarMessage = message;
       }
 
+      hoverOptions.push({
+        range: targetError.range, // エラーの範囲（赤波線の場所）を指定
+        hoverMessage: message     // 同じメッセージを設定
+      });
+
       DecorationOptions.push({
         range: range,
         renderOptions: { after: { contentText: message } },
@@ -203,6 +212,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
+    editor.setDecorations(hoverDecorationType, hoverOptions);
     if (sidebarMessage) {
       mascotProvider.updateMessage(sidebarMessage);
     }
