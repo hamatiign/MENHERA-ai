@@ -1,71 +1,67 @@
-# menhera-ai README
+<p align="center">
+  <img src="images/new_menhera_logo.png" alt="Menhera AI Logo" width="200"/>
+</p>
 
-This is the README for your extension "menhera-ai". After writing up a brief description, we recommend including the following sections.
+<h1 align="center">Menhera AI (メンヘラAI)</h1>
 
-## Features
+<p align="center">
+  <b>あなたのコードを、愛という名の執着で見守ります。</b>
+</p>
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
-
-For example if there is an image subfolder under your extension project workspace:
-
-\!\[feature X\]\(images/feature-x.png\)
-
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
-
-## Requirements
-
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=menhera-ai">
+    <img src="https://img.shields.io/badge/VS%20Code-Extension-ff69b4?style=flat-square&logo=visual-studio-code" alt="VS Code Extension">
+  </a>
+  <img src="https://img.shields.io/badge/Version-0.0.1-ff8ce0?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/Love-Heavy-red?style=flat-square" alt="Love">
+</p>
 
 ---
 
-## Following extension guidelines
+**Menhera AI** は、あなたの VS Code に住み着く「ちょっと重めの彼女（AI）」です。
+プログラミングのエラーメッセージを、**嫉妬や執着が入り混じった「メンヘラ構文」**に翻訳して伝えてくれます。
 
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
+放置すると激怒したり、手紙を送りつけてきたりします。愛情（デバッグ）を持って接してください。
 
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
+## 💕 機能 (Features)
 
-## Working with Markdown
+### 1. エラーメッセージのメンヘラ化
 
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
+Gemini API を使用して、冷たいエラーメッセージを感情豊かな言葉に変換し、エディタ上に表示します。
 
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
+> **Before:** `Expected ';' but found '}'`  
+> **After:** `「セミコロン忘れてる。詰めが甘いんだよ...私のことも忘れる気？」`
 
-## For more information
+### 2. ずっと見ているマスコット
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+サイドバーに「メンヘラ AI マスコット」が常駐します。あなたがコードを書いている間、ずっとこちらを見つめています。
 
-**Enjoy!**
+### 3. 💀 お仕置きモード (Punishment Mode)
+
+エラーを放置しすぎると、彼女の機嫌が悪くなります。
+
+- **激怒:** エラーが **5 個以上** 溜まると、ウィンドウ全体が赤く染まり、激怒モードに突入します。
+- **手紙:** それでも放置すると、ワークスペースに **「私からの手紙.txt」** が生成されます。
+- **解決:** エラーを解消すると、機嫌が直り、手紙も自分で片付けてくれます。
+
+---
+
+## 🛠️ インストールと設定 (Setup)
+
+この拡張機能を使用するには、Google Gemini API キーが必要です。
+
+1.  **インストール:** マーケットプレイスからインストールします。
+2.  **API キー取得:** [Google AI Studio](https://aistudio.google.com/app/apikey) でキーを取得します。
+3.  **設定:** VS Code の設定 (`Ctrl+,`) で `menhera` と検索し、API キーを入力してください。
+
+---
+
+## ⚠️ 注意事項
+
+- お仕置きモードで生成される `.txt` ファイルは、エラー解消時に自動削除されます。重要なファイルを上書きすることはありません。
+
+---
+
+<p align="center">
+  <i>Developed with 🖤 (and heavy love)</i>
+</p>
