@@ -21,6 +21,8 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
   rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 });
 
+const hoverDecorationType = vscode.window.createTextEditorDecorationType({});
+
 const responses: { [key: string]: string } = responsesData;
 
 // -1: 初期状態, 0以上: 前回のエラー数
@@ -71,11 +73,12 @@ if (errors.length === 0) {
       }
       previousErrorCount = 0;
       return;
-    }
+}
 
     // エラーがあった場合の処理
     previousErrorCount = errors.length;
     const DecorationOptions: vscode.DecorationOptions[] = [];
+    const hoverOptions: vscode.DecorationOptions[] = [];
     
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
@@ -93,10 +96,16 @@ if (errors.length === 0) {
         hoverMessage: message,
       };
 
+      hoverOptions.push({
+        range: targetError.range, // エラーの範囲（赤波線の場所）を指定
+        hoverMessage: message     // 同じメッセージを設定
+      });
+
       DecorationOptions.push(decolatinoOption);
     }
 
     editor.setDecorations(menheraDecorationType, DecorationOptions);
+    editor.setDecorations(hoverDecorationType, hoverOptions);
     mascotProvider.updateMessage('仮メッセージ');
   };
 
