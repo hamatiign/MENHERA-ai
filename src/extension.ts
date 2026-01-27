@@ -118,7 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
           
           // ヘルパー関数で深さを計測
           const maxDepth = checkNestingLevel(editor.document);
-          const nestLimit = 5; // 5階層以上で指摘
+          const nestLimit = 8; // 指定階層以上で指摘
 
           if (maxDepth >= nestLimit) {
               const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
