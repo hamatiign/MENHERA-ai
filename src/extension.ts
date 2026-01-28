@@ -38,6 +38,63 @@ let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
 
+let eyeStatusBar: vscode.StatusBarItem | undefined;
+let eyeHideTimer: NodeJS.Timeout | undefined;
+let eyeAnimTimer: NodeJS.Timeout | undefined;
+let eyeAnimFrame = 0;
+let eyeFinalHideTimer: NodeJS.Timeout | undefined;
+
+let eyeStatusBars: vscode.StatusBarItem[] = [];
+const MESSAGES = [
+  "みてるよ", "ずっといっしょ", "どこにいるの", "ねぇ", "逃がさない", 
+  "愛してる", "なにしてるの？", "しってるよ", "あいたい", "どこ？", 
+  "みて", "ひとり？", "だれといるの", "なんで返事してくれないの？",
+  "みてるからね", "みてる", "さびしい", "なにやってんの？"
+];
+
+function ensureEyeStatusBars() {
+  if (eyeStatusBars.length > 0) return eyeStatusBars;
+  
+  for (let i = 0; i < 30; i++) {
+    const item = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      2000 + i
+    );
+    item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    item.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+    eyeStatusBars.push(item);
+  }
+  return eyeStatusBars;
+}
+
+function showEyeWhileTyping() {
+  const items = ensureEyeStatusBars();
+
+  // タイピングのたびにメッセージの配置をシャッフル（点滅ではなく、内容が入れ替わる程度）
+  items.forEach((item, index) => {
+    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % MESSAGES.length];
+    item.text = `$(eye) ${msg}`;
+    item.show();
+  });
+
+  if (eyeHideTimer) { clearTimeout(eyeHideTimer); }
+  if (eyeFinalHideTimer) {
+    clearTimeout(eyeFinalHideTimer);
+    eyeFinalHideTimer = undefined;
+  }
+
+  eyeHideTimer = setTimeout(() => {
+    items.forEach(item => {
+      item.text = "$(eye)";
+    });
+
+    eyeFinalHideTimer = setTimeout(() => {
+      items.forEach(item => item.hide());
+      eyeFinalHideTimer = undefined;
+    }, 10000);
+  }, 5000);
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
 
@@ -52,6 +109,24 @@ export function activate(context: vscode.ExtensionContext) {
 
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
+
+  // ステータスバーの目を管理（拡張停止時にdispose）
+  context.subscriptions.push({
+    dispose: () => {
+      eyeStatusBar?.dispose();
+      eyeStatusBar = undefined;
+    },
+  });
+
+  const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+    // 変更内容がない場合は無視
+    if (event.contentChanges.length === 0) {
+      return;
+    }
+    // 入力中だけ、エディタに干渉しない場所(ステータスバー右側)に目を表示
+    showEyeWhileTyping();
+  });
+  context.subscriptions.push(typeListener);
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
@@ -78,7 +153,7 @@ export function activate(context: vscode.ExtensionContext) {
       (d) => d.severity === vscode.DiagnosticSeverity.Error,
     );
 
-// extension.ts の 81行目付近から始まる if文ブロックを書き換え
+    // extension.ts の 81行目付近から始まる if文ブロックを書き換え
 
     // ==========================================
     // 🧹 1. エラーがない時（お掃除＆ご機嫌タイム）
@@ -112,23 +187,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const now = Date.now();
-      
+
       // 条件: 「起動直後ではない」 かつ 「前回の指摘から時間が経っている」 場合のみチェック
       if ((now - startupTime) >= STARTUP_GRACE_PERIOD && (now - lastNestingComplaintTime) >= NESTING_COOLDOWN) {
-          
-          // ヘルパー関数で深さを計測
-          const maxDepth = checkNestingLevel(editor.document);
-          const nestLimit = 8; // 指定階層以上で指摘
 
-          if (maxDepth >= nestLimit) {
-              const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
-              mascotProvider.updateMessage(msg);
-              
-              // ネストのチェックの時間を更新し、しばらくは静かにさせる
-              lastNestingComplaintTime = now;
-              
-              return; 
-          }
+        // ヘルパー関数で深さを計測
+        const maxDepth = checkNestingLevel(editor.document);
+        const nestLimit = 8; // 指定階層以上で指摘
+
+        if (maxDepth >= nestLimit) {
+          const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
+          mascotProvider.updateMessage(msg);
+
+          // ネストのチェックの時間を更新し、しばらくは静かにさせる
+          lastNestingComplaintTime = now;
+
+          return;
+        }
       }
       // ---------------------------------------------------------
 
@@ -216,7 +291,7 @@ export function activate(context: vscode.ExtensionContext) {
     // ゴーストテキスト表示
     const DecorationOptions: vscode.DecorationOptions[] = [];
     const hoverOptions: vscode.DecorationOptions[] = [];
-    
+
     let sidebarMessage = "";
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
@@ -311,7 +386,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 }
 
-export function deactivate() {}
+export function deactivate() { }
 
 // ヘルパー関数たち
 const GetJsonKey = (error: vscode.Diagnostic) => {
@@ -494,17 +569,23 @@ function playAudio(filePath: string) {
     // Windows: PowerShellを使って裏で再生（画面は出ません！）
     const command = `powershell -c (New-Object Media.SoundPlayer '${safePath}').PlaySync()`;
     cp.exec(command, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   } else if (process.platform === "darwin") {
     // Mac: afplayコマンド
     cp.exec(`afplay "${filePath}"`, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   } else {
     // Linux: aplay (環境による)
     cp.exec(`aplay "${filePath}"`, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   }
 }
@@ -512,14 +593,14 @@ function playAudio(filePath: string) {
 // ネストの深さをチェックする関数
 function checkNestingLevel(document: vscode.TextDocument): number {
   let maxDepth = 0;
-  
+
   for (let i = 0; i < document.lineCount; i++) {
     const line = document.lineAt(i);
     const text = line.text;
 
     // 空行やコメント行(//)は無視
     if (text.trim() === "" || text.trim().startsWith("//")) {
-        continue; 
+      continue;
     }
 
     // 行頭の空白文字を取得
@@ -528,7 +609,7 @@ function checkNestingLevel(document: vscode.TextDocument): number {
 
     // スペース4つ（またはタブ1つ）を1階層として計算
     // ※スペース2つで1階層の環境なら / 2 に変更してください
-    const currentDepth = Math.floor(indentLength / 4); 
+    const currentDepth = Math.floor(indentLength / 4);
 
     if (currentDepth > maxDepth) {
       maxDepth = currentDepth;

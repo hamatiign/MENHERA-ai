@@ -4,7 +4,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'menhera-ai.mascotView';
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(private readonly _extensionUri: vscode.Uri) { }
 
     public resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
