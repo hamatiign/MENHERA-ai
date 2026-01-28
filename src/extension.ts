@@ -38,6 +38,8 @@ let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
 
+let isEyeShowing = false;
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
 
@@ -56,6 +58,10 @@ export function activate(context: vscode.ExtensionContext) {
   const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
     // 変更内容がない場合は無視
     if (event.contentChanges.length === 0) {
+      return;
+    }
+
+    if (isEyeShowing) {
       return;
     }
 
@@ -559,17 +565,16 @@ function checkNestingLevel(document: vscode.TextDocument): number {
  * カーソル位置に一瞬画像を表示して消す関数
  */
 function showEyeDecoration(editor: vscode.TextEditor, position: vscode.Position, extensionUri: vscode.Uri) {
-  const imageFileName = "eye.png";
+  isEyeShowing = true;
+  const imageFileName = "eye2.png";
   const imageUri = vscode.Uri.joinPath(extensionUri, "images", imageFileName);
 
   // 装飾（デコレーション）の定義を作成
   const decorationType = vscode.window.createTextEditorDecorationType({
-    pointerEvents: "none",
     after: {
       contentIconPath: imageUri, // 画像を設定
       margin: "0 0 0 5px",       // 文字から少し右に離す
-      width: "50px",            // 画像の幅
-      height: "50px",           // 画像の高さ
+      width: "50px",
     },
   });
 
@@ -582,5 +587,6 @@ function showEyeDecoration(editor: vscode.TextEditor, position: vscode.Position,
   // 1秒(1000ms)後に装飾を削除して消す
   setTimeout(() => {
     decorationType.dispose();
+    isEyeShowing = false;
   }, 1000);
 }
