@@ -53,6 +53,25 @@ export function activate(context: vscode.ExtensionContext) {
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
+  const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
+    // 変更内容がない場合は無視
+    if (event.contentChanges.length === 0) {
+      return;
+    }
+
+    // 文字を入力したとき、2% の確率でこの関数が動く
+    if (Math.random() < 0.02) {
+      const editor = vscode.window.activeTextEditor;
+      if (editor && editor.document === event.document) {
+        const position = editor.selection.active;
+        
+        // 演出用関数を呼び出す
+        showEyeDecoration(editor, position, context.extensionUri);
+      }
+    }
+  });
+  context.subscriptions.push(typeListener);
+
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
       return;
