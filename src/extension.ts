@@ -38,7 +38,86 @@ let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
 
-let isEyeShowing = false;
+let eyeStatusBar: vscode.StatusBarItem | undefined;
+let eyeHideTimer: NodeJS.Timeout | undefined;
+let eyeAnimTimer: NodeJS.Timeout | undefined;
+let eyeAnimFrame = 0;
+let eyeFinalHideTimer: NodeJS.Timeout | undefined;
+
+function ensureEyeStatusBar() {
+  if (eyeStatusBar) {
+    return eyeStatusBar;
+  }
+  // エディタに干渉しない「端」としてステータスバー右側に固定表示
+  eyeStatusBar = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    1000,
+  );
+  eyeStatusBar.text = "$(eye) みてる";
+  eyeStatusBar.tooltip = "ずっと見てるからね。";
+  // 派手め（入力中だけアニメでさらに目立たせる）
+  eyeStatusBar.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+  eyeStatusBar.backgroundColor = new vscode.ThemeColor(
+    "statusBarItem.errorBackground",
+  );
+  return eyeStatusBar;
+}
+
+function showEyeWhileTyping() {
+  const item = ensureEyeStatusBar();
+  item.show();
+  if (eyeHideTimer) {
+    clearTimeout(eyeHideTimer);
+  }
+  if (eyeFinalHideTimer) {
+    clearTimeout(eyeFinalHideTimer);
+    eyeFinalHideTimer = undefined;
+  }
+  if (!eyeAnimTimer) {
+    // 入力中だけ点滅・瞬きで派手に
+    eyeAnimFrame = 0;
+    eyeAnimTimer = setInterval(() => {
+      if (!eyeStatusBar) {
+        return;
+      }
+      eyeAnimFrame++;
+      const blink = eyeAnimFrame % 6 === 0;
+      const icon = blink ? "$(eye-closed)" : "$(eye)";
+      const pulse = eyeAnimFrame % 2 === 0 ? "$(circle-filled)" : "$(circle-outline)";
+      eyeStatusBar.text = `${icon} ${pulse} みてる`;
+      // 背景色も交互に（派手だけど場所は固定で邪魔しにくい）
+      eyeStatusBar.backgroundColor = new vscode.ThemeColor(
+        eyeAnimFrame % 2 === 0
+          ? "statusBarItem.errorBackground"
+          : "statusBarItem.warningBackground",
+      );
+      eyeStatusBar.color = new vscode.ThemeColor(
+        eyeAnimFrame % 2 === 0
+          ? "statusBarItem.errorForeground"
+          : "statusBarItem.warningForeground",
+      );
+    }, 140);
+  }
+  // 入力が途切れたら自然に消える
+  eyeHideTimer = setTimeout(() => {
+    // すぐ消すと気づきにくいので、まずアニメだけ止めて「監視中」表示で残す
+    if (eyeAnimTimer) {
+      clearInterval(eyeAnimTimer);
+      eyeAnimTimer = undefined;
+    }
+    item.text = "$(eye) みてる";
+    item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
+    item.color = new vscode.ThemeColor("statusBarItem.warningForeground");
+
+    // 一定時間たったら完全に隠す（長めに）
+    eyeFinalHideTimer = setTimeout(() => {
+      item.hide();
+      item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+      item.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+      eyeFinalHideTimer = undefined;
+    }, 8000);
+  }, 1200);
+}
 
 export function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
@@ -55,26 +134,21 @@ export function activate(context: vscode.ExtensionContext) {
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
+  // ステータスバーの目を管理（拡張停止時にdispose）
+  context.subscriptions.push({
+    dispose: () => {
+      eyeStatusBar?.dispose();
+      eyeStatusBar = undefined;
+    },
+  });
+
   const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
     // 変更内容がない場合は無視
     if (event.contentChanges.length === 0) {
       return;
     }
-
-    if (isEyeShowing) {
-      return;
-    }
-
-    // 文字を入力したとき、2% の確率でこの関数が動く
-    if (Math.random() < 0.02) {
-      const editor = vscode.window.activeTextEditor;
-      if (editor && editor.document === event.document) {
-        const position = editor.selection.active;
-        
-        // 演出用関数を呼び出す
-        showEyeDecoration(editor, position, context.extensionUri);
-      }
-    }
+    // 入力中だけ、エディタに干渉しない場所(ステータスバー右側)に目を表示
+    showEyeWhileTyping();
   });
   context.subscriptions.push(typeListener);
 
@@ -103,7 +177,7 @@ export function activate(context: vscode.ExtensionContext) {
       (d) => d.severity === vscode.DiagnosticSeverity.Error,
     );
 
-// extension.ts の 81行目付近から始まる if文ブロックを書き換え
+    // extension.ts の 81行目付近から始まる if文ブロックを書き換え
 
     // ==========================================
     // 🧹 1. エラーがない時（お掃除＆ご機嫌タイム）
@@ -137,23 +211,23 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const now = Date.now();
-      
+
       // 条件: 「起動直後ではない」 かつ 「前回の指摘から時間が経っている」 場合のみチェック
       if ((now - startupTime) >= STARTUP_GRACE_PERIOD && (now - lastNestingComplaintTime) >= NESTING_COOLDOWN) {
-          
-          // ヘルパー関数で深さを計測
-          const maxDepth = checkNestingLevel(editor.document);
-          const nestLimit = 8; // 指定階層以上で指摘
 
-          if (maxDepth >= nestLimit) {
-              const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
-              mascotProvider.updateMessage(msg);
-              
-              // ネストのチェックの時間を更新し、しばらくは静かにさせる
-              lastNestingComplaintTime = now;
-              
-              return; 
-          }
+        // ヘルパー関数で深さを計測
+        const maxDepth = checkNestingLevel(editor.document);
+        const nestLimit = 8; // 指定階層以上で指摘
+
+        if (maxDepth >= nestLimit) {
+          const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
+          mascotProvider.updateMessage(msg);
+
+          // ネストのチェックの時間を更新し、しばらくは静かにさせる
+          lastNestingComplaintTime = now;
+
+          return;
+        }
       }
       // ---------------------------------------------------------
 
@@ -241,7 +315,7 @@ export function activate(context: vscode.ExtensionContext) {
     // ゴーストテキスト表示
     const DecorationOptions: vscode.DecorationOptions[] = [];
     const hoverOptions: vscode.DecorationOptions[] = [];
-    
+
     let sidebarMessage = "";
     for (let i = 0; i < errors.length; i++) {
       const targetError = errors[i];
@@ -336,7 +410,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 }
 
-export function deactivate() {}
+export function deactivate() { }
 
 // ヘルパー関数たち
 const GetJsonKey = (error: vscode.Diagnostic) => {
@@ -519,17 +593,23 @@ function playAudio(filePath: string) {
     // Windows: PowerShellを使って裏で再生（画面は出ません！）
     const command = `powershell -c (New-Object Media.SoundPlayer '${safePath}').PlaySync()`;
     cp.exec(command, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   } else if (process.platform === "darwin") {
     // Mac: afplayコマンド
     cp.exec(`afplay "${filePath}"`, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   } else {
     // Linux: aplay (環境による)
     cp.exec(`aplay "${filePath}"`, (error) => {
-      if (error) console.error("再生エラー:", error);
+      if (error) {
+        console.error("再生エラー:", error);
+      }
     });
   }
 }
@@ -537,7 +617,7 @@ function playAudio(filePath: string) {
 // ネストの深さをチェックする関数
 function checkNestingLevel(document: vscode.TextDocument): number {
   let maxDepth = 0;
-  
+
   for (let i = 0; i < document.lineCount; i++) {
     const line = document.lineAt(i);
     const text = line.text;
@@ -560,33 +640,4 @@ function checkNestingLevel(document: vscode.TextDocument): number {
     }
   }
   return maxDepth;
-}
-/**
- * カーソル位置に一瞬画像を表示して消す関数
- */
-function showEyeDecoration(editor: vscode.TextEditor, position: vscode.Position, extensionUri: vscode.Uri) {
-  isEyeShowing = true;
-  const imageFileName = "eye2.png";
-  const imageUri = vscode.Uri.joinPath(extensionUri, "images", imageFileName);
-
-  // 装飾（デコレーション）の定義を作成
-  const decorationType = vscode.window.createTextEditorDecorationType({
-    after: {
-      contentIconPath: imageUri, // 画像を設定
-      margin: "0 0 0 5px",       // 文字から少し右に離す
-      width: "50px",
-    },
-  });
-
-  // 装飾を適用する範囲を作成（カーソル位置の1点）
-  const range = new vscode.Range(position, position);
-
-  // エディタに装飾を適用
-  editor.setDecorations(decorationType, [range]);
-
-  // 1秒(1000ms)後に装飾を削除して消す
-  setTimeout(() => {
-    decorationType.dispose();
-    isEyeShowing = false;
-  }, 1000);
 }
