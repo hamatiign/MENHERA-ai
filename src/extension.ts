@@ -538,7 +538,7 @@ function checkNestingLevel(document: vscode.TextDocument): number {
 
     // 空行やコメント行(//)は無視
     if (text.trim() === "" || text.trim().startsWith("//")) {
-        continue; 
+      continue;
     }
 
     // 行頭の空白文字を取得
@@ -547,11 +547,40 @@ function checkNestingLevel(document: vscode.TextDocument): number {
 
     // スペース4つ（またはタブ1つ）を1階層として計算
     // ※スペース2つで1階層の環境なら / 2 に変更してください
-    const currentDepth = Math.floor(indentLength / 4); 
+    const currentDepth = Math.floor(indentLength / 4);
 
     if (currentDepth > maxDepth) {
       maxDepth = currentDepth;
     }
   }
   return maxDepth;
+}
+/**
+ * カーソル位置に一瞬画像を表示して消す関数
+ */
+function showEyeDecoration(editor: vscode.TextEditor, position: vscode.Position, extensionUri: vscode.Uri) {
+  const imageFileName = "eye.png";
+  const imageUri = vscode.Uri.joinPath(extensionUri, "images", imageFileName);
+
+  // 装飾（デコレーション）の定義を作成
+  const decorationType = vscode.window.createTextEditorDecorationType({
+    pointerEvents: "none",
+    after: {
+      contentIconPath: imageUri, // 画像を設定
+      margin: "0 0 0 5px",       // 文字から少し右に離す
+      width: "50px",            // 画像の幅
+      height: "50px",           // 画像の高さ
+    },
+  });
+
+  // 装飾を適用する範囲を作成（カーソル位置の1点）
+  const range = new vscode.Range(position, position);
+
+  // エディタに装飾を適用
+  editor.setDecorations(decorationType, [range]);
+
+  // 1秒(1000ms)後に装飾を削除して消す
+  setTimeout(() => {
+    decorationType.dispose();
+  }, 1000);
 }
