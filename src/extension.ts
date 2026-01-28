@@ -44,79 +44,55 @@ let eyeAnimTimer: NodeJS.Timeout | undefined;
 let eyeAnimFrame = 0;
 let eyeFinalHideTimer: NodeJS.Timeout | undefined;
 
-function ensureEyeStatusBar() {
-  if (eyeStatusBar) {
-    return eyeStatusBar;
+let eyeStatusBars: vscode.StatusBarItem[] = [];
+const MESSAGES = [
+  "みてるよ", "ずっといっしょ", "どこにいるの", "ねぇ", "逃がさない", 
+  "愛してる", "なにしてるの？", "しってるよ", "あいたい", "どこ？", 
+  "みて", "ひとり？", "だれといるの", "なんで返事してくれないの？",
+  "みてるからね", "みてる", "さびしい", "なにやってんの？"
+];
+
+function ensureEyeStatusBars() {
+  if (eyeStatusBars.length > 0) return eyeStatusBars;
+  
+  for (let i = 0; i < 30; i++) {
+    const item = vscode.window.createStatusBarItem(
+      vscode.StatusBarAlignment.Right,
+      2000 + i
+    );
+    item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
+    item.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+    eyeStatusBars.push(item);
   }
-  // エディタに干渉しない「端」としてステータスバー右側に固定表示
-  eyeStatusBar = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    1000,
-  );
-  eyeStatusBar.text = "$(eye) みてる";
-  eyeStatusBar.tooltip = "ずっと見てるからね。";
-  // 派手め（入力中だけアニメでさらに目立たせる）
-  eyeStatusBar.color = new vscode.ThemeColor("statusBarItem.errorForeground");
-  eyeStatusBar.backgroundColor = new vscode.ThemeColor(
-    "statusBarItem.errorBackground",
-  );
-  return eyeStatusBar;
+  return eyeStatusBars;
 }
 
 function showEyeWhileTyping() {
-  const item = ensureEyeStatusBar();
-  item.show();
-  if (eyeHideTimer) {
-    clearTimeout(eyeHideTimer);
-  }
+  const items = ensureEyeStatusBars();
+
+  // タイピングのたびにメッセージの配置をシャッフル（点滅ではなく、内容が入れ替わる程度）
+  items.forEach((item, index) => {
+    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % MESSAGES.length];
+    item.text = `$(eye) ${msg}`;
+    item.show();
+  });
+
+  if (eyeHideTimer) { clearTimeout(eyeHideTimer); }
   if (eyeFinalHideTimer) {
     clearTimeout(eyeFinalHideTimer);
     eyeFinalHideTimer = undefined;
   }
-  if (!eyeAnimTimer) {
-    // 入力中だけ点滅・瞬きで派手に
-    eyeAnimFrame = 0;
-    eyeAnimTimer = setInterval(() => {
-      if (!eyeStatusBar) {
-        return;
-      }
-      eyeAnimFrame++;
-      const blink = eyeAnimFrame % 6 === 0;
-      const icon = blink ? "$(eye-closed)" : "$(eye)";
-      const pulse = eyeAnimFrame % 2 === 0 ? "$(circle-filled)" : "$(circle-outline)";
-      eyeStatusBar.text = `${icon} ${pulse} みてる`;
-      // 背景色も交互に（派手だけど場所は固定で邪魔しにくい）
-      eyeStatusBar.backgroundColor = new vscode.ThemeColor(
-        eyeAnimFrame % 2 === 0
-          ? "statusBarItem.errorBackground"
-          : "statusBarItem.warningBackground",
-      );
-      eyeStatusBar.color = new vscode.ThemeColor(
-        eyeAnimFrame % 2 === 0
-          ? "statusBarItem.errorForeground"
-          : "statusBarItem.warningForeground",
-      );
-    }, 140);
-  }
-  // 入力が途切れたら自然に消える
-  eyeHideTimer = setTimeout(() => {
-    // すぐ消すと気づきにくいので、まずアニメだけ止めて「監視中」表示で残す
-    if (eyeAnimTimer) {
-      clearInterval(eyeAnimTimer);
-      eyeAnimTimer = undefined;
-    }
-    item.text = "$(eye) みてる";
-    item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
-    item.color = new vscode.ThemeColor("statusBarItem.warningForeground");
 
-    // 一定時間たったら完全に隠す（長めに）
+  eyeHideTimer = setTimeout(() => {
+    items.forEach(item => {
+      item.text = "$(eye)";
+    });
+
     eyeFinalHideTimer = setTimeout(() => {
-      item.hide();
-      item.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
-      item.color = new vscode.ThemeColor("statusBarItem.errorForeground");
+      items.forEach(item => item.hide());
       eyeFinalHideTimer = undefined;
-    }, 8000);
-  }, 1200);
+    }, 10000);
+  }, 5000);
 }
 
 export function activate(context: vscode.ExtensionContext) {
