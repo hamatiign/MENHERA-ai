@@ -69,6 +69,16 @@
           "type": "string",
           "default": "",
           "description": "Google Gemini APIキーを入力してください"
+        },
+        "menhera-ai.angerThreshold": {
+          "type": "number",
+          "default": 5,
+          "description": "メンヘラ彼女が激怒モード（お仕置き）に入るエラーの数"
+        },
+        "menhera-ai.enableVoice": {
+          "type": "boolean",
+          "default": true,
+          "description": "手紙が届いた時にボイスを再生するかどうか"
         }
       }
     }
