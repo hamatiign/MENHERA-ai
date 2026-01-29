@@ -145,6 +145,8 @@ export function activate(context: vscode.ExtensionContext) {
     const apiKey = config.get<string>("apiKey");
     const angerThreshold = config.get<number>("angerThreshold", 5); 
     const enableVoice = config.get<boolean>("enableVoice", true);
+    const checkDelay = config.get<number>("checkDelay", 2000); // デフォルト2秒
+    const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
 
     if (!apiKey) {
       return;
@@ -360,7 +362,11 @@ export function activate(context: vscode.ExtensionContext) {
   const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
     (event) => {
       const editor = vscode.window.activeTextEditor;
-      if (
+      const config = vscode.workspace.getConfiguration("menhera-ai");
+      const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
+      const checkDelay = config.get<number>("checkDelay", 2000);
+
+      if (enableCheckOnEdit &&
         editor &&
         event.uris.some(
           (uri) => uri.toString() === editor.document.uri.toString(),
@@ -372,12 +378,17 @@ export function activate(context: vscode.ExtensionContext) {
         }
         timeout = setTimeout(() => {
           updateDecorations(editor);
-        }, 2000);
+        }, checkDelay);
       }
     },
   );
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
+    const config = vscode.workspace.getConfiguration("menhera-ai");
+    const enableCheckOnSave = config.get<boolean>("enableCheckOnSave", true);
+
+    if (!enableCheckOnSave) { return; }
+    
     vscode.window.visibleTextEditors.forEach((editor) => {
       if (editor.document.uri.toString() === document.uri.toString()) {
         updateDecorations(editor);

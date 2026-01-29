@@ -79,6 +79,21 @@
           "type": "boolean",
           "default": true,
           "description": "手紙が届いた時にボイスを再生するかどうか"
+        },
+        "menhera-ai.checkDelay": {
+          "type": "number",
+          "default": 2000,
+          "description": "入力が止まってからメンヘラチェックが走るまでの待機時間（ミリ秒）"
+        },
+        "menhera-ai.enableCheckOnEdit": {
+          "type": "boolean",
+          "default": true,
+          "description": "入力中（自動診断時）にメンヘラチェックを行うかどうか"
+        },
+        "menhera-ai.enableCheckOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "保存時にメンヘラチェックを行うかどうか"
         }
       }
     }
