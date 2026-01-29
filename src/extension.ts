@@ -146,7 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
-    const angerThreshold = config.get<number>("angerThreshold", 5); 
+    const angerThreshold = config.get<number>("angerThreshold", 5);
     const enableVoice = config.get<boolean>("enableVoice", true);
     const checkDelay = config.get<number>("checkDelay", 2000); // デフォルト2秒
     const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
@@ -244,14 +244,14 @@ export function activate(context: vscode.ExtensionContext) {
         await changeWindowColor(true);
         vscode.window.showErrorMessage("エラー直してくれないから...ね？");
 
-        if(enableVoice){
-        const audioPath = path.join(
-          context.extensionPath,
-          "audio",
-          "first-letter-voice-ver2.wav",
-        );
-        playAudio(audioPath);
-      }
+        if (enableVoice) {
+          const audioPath = path.join(
+            context.extensionPath,
+            "audio",
+            "first-letter-voice-ver2.wav",
+          );
+          playAudio(audioPath);
+        }
 
         runPunishmentLogic(
           workspaceFolders,
@@ -265,14 +265,14 @@ export function activate(context: vscode.ExtensionContext) {
         stagnationTimeout = setTimeout(async () => {
           vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
 
-          if(enableVoice){
-          const audioPath = path.join(
-            context.extensionPath,
-            "audio",
-            "second-letter-voice.wav",
-          );
-          playAudio(audioPath);
-        }
+          if (enableVoice) {
+            const audioPath = path.join(
+              context.extensionPath,
+              "audio",
+              "second-letter-voice.wav",
+            );
+            playAudio(audioPath);
+          }
           await runPunishmentLogic(
             workspaceFolders,
             "まだ直さないの.txt",
@@ -406,28 +406,55 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const gitExtension = vscode.extensions.getExtension<any>('vscode.git')?.exports;
-    if (gitExtension) {
-        const git = gitExtension.getAPI(1);
+  if (gitExtension) {
+    const git = gitExtension.getAPI(1);
 
-        // リポジトリが開かれた時の処理
-        git.onDidOpenRepository((repo: any) => {
-            // コミット入力欄の変化を監視
-            repo.inputBox.onDidChange(async (value: string) => {
-                if (value.trim() === "") return;
+    // リポジトリが開かれた時の処理
+    git.onDidOpenRepository((repo: any) => {
+      // コミット入力欄の変化を監視
+      repo.inputBox.onDidChange(async (value: string) => {
+        if (value.trim() === "") return;
 
-                // Conventional Commitに適合しているかチェック
-                const isValid = CONVENTIONAL_COMMIT_REGEX.test(value);
+        // Conventional Commitに適合しているかチェック
+        const isValid = CONVENTIONAL_COMMIT_REGEX.test(value);
 
-                if (!isValid) {
-                    // 形式が違う場合：激怒演出
-                    mascotProvider.updateMood(true); // 激怒画像へ
-                    const angryMsg = "ねぇ、そのコミットメッセージなに…？適当すぎない？Conventional Commitも守れないなら、もう何も送らないで。";
-                    mascotProvider.updateMessage(angryMsg);
-                    await changeWindowColor(true); // 画面を赤く
-                } 
-            });
-        });
-    }
+        if (!isValid) {
+          // 形式が違う場合：激怒演出
+          mascotProvider.updateMood(true); // 激怒画像へ
+          const angryMsg = "ねぇ、そのコミットメッセージなに…？適当すぎない？Conventional Commitも守れないなら、もう何も送らないで。";
+          mascotProvider.updateMessage(angryMsg);
+          await changeWindowColor(true); // 画面を赤く
+        }
+      });
+          
+      repo.onDidCommit(async () => {
+        // 状態更新のタイムラグを考慮して少し待つ
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        const lastCommit = repo.state.HEAD?.commit;
+        if (!lastCommit) return;
+
+        const message = lastCommit.message;
+        const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
+
+        if (!isValid) {
+          mascotProvider.updateMood(true);
+          const firstLine = message.split('\n')[0];
+          const angryMsg = `ねぇ、さっきのコミットメッセージ（${firstLine}）なに…？適当すぎ。そんなに私のルールを破りたいの？`;
+          mascotProvider.updateMessage(angryMsg);
+          await changeWindowColor(true);
+
+          const activeTerminal = vscode.window.activeTerminal;
+          if (activeTerminal) {
+            // \x1b[1;31m で赤文字にしている
+            const terminalAngryMsg = `echo "\n\x1b[1;31m[MENHERA-AI] ねぇ、さっきのコミット（${firstLine}）なに？\x1b[0m" && echo "\x1b[1;31m[MENHERA-AI] Conventional Commitsも守れないなら、もう何も送らないで。\x1b[0m\n"`;
+                
+            activeTerminal.sendText(terminalAngryMsg);
+          }
+        }
+      });
+    });
+  }
 }
 
 export function deactivate() { }
