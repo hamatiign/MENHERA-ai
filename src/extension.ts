@@ -143,6 +143,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
+    const angerThreshold = config.get<number>("angerThreshold", 5); 
+    const enableVoice = config.get<boolean>("enableVoice", true);
+    const checkDelay = config.get<number>("checkDelay", 2000); // デフォルト2秒
+    const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
 
     if (!apiKey) {
       return;
@@ -220,9 +224,9 @@ export function activate(context: vscode.ExtensionContext) {
     previousErrorCount = errors.length;
 
     // ==========================================
-    // 💀 2. エラー5個以上（お仕置き＆追撃セット）
+    // 💀 2. エラー5個以上（お仕置き＆追撃セット） => ユーザーが変更できるように(初期値は5のまま)
     // ==========================================
-    if (errors.length >= 5) {
+    if (errors.length >= angerThreshold) {
       // ★サイドバーを「激怒モード」にする！
       mascotProvider.updateMood(true);
       mascotProvider.updateMessage(
@@ -237,12 +241,14 @@ export function activate(context: vscode.ExtensionContext) {
         await changeWindowColor(true);
         vscode.window.showErrorMessage("エラー直してくれないから...ね？");
 
+        if(enableVoice){
         const audioPath = path.join(
           context.extensionPath,
           "audio",
           "first-letter-voice-ver2.wav",
         );
         playAudio(audioPath);
+      }
 
         runPunishmentLogic(
           workspaceFolders,
@@ -256,12 +262,14 @@ export function activate(context: vscode.ExtensionContext) {
         stagnationTimeout = setTimeout(async () => {
           vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
 
+          if(enableVoice){
           const audioPath = path.join(
             context.extensionPath,
             "audio",
             "second-letter-voice.wav",
           );
           playAudio(audioPath);
+        }
           await runPunishmentLogic(
             workspaceFolders,
             "まだ直さないの.txt",
@@ -354,7 +362,11 @@ export function activate(context: vscode.ExtensionContext) {
   const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
     (event) => {
       const editor = vscode.window.activeTextEditor;
-      if (
+      const config = vscode.workspace.getConfiguration("menhera-ai");
+      const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
+      const checkDelay = config.get<number>("checkDelay", 2000);
+
+      if (enableCheckOnEdit &&
         editor &&
         event.uris.some(
           (uri) => uri.toString() === editor.document.uri.toString(),
@@ -366,12 +378,17 @@ export function activate(context: vscode.ExtensionContext) {
         }
         timeout = setTimeout(() => {
           updateDecorations(editor);
-        }, 2000);
+        }, checkDelay);
       }
     },
   );
 
   const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {
+    const config = vscode.workspace.getConfiguration("menhera-ai");
+    const enableCheckOnSave = config.get<boolean>("enableCheckOnSave", true);
+
+    if (!enableCheckOnSave) { return; }
+    
     vscode.window.visibleTextEditors.forEach((editor) => {
       if (editor.document.uri.toString() === document.uri.toString()) {
         updateDecorations(editor);
