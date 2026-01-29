@@ -15,6 +15,9 @@
   "categories": [
     "Other"
   ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:javascript",

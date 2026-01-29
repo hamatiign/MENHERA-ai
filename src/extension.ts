@@ -12,6 +12,9 @@ import {
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
 
+// conventional commit のリスト
+const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+/;
+
 // --- 起動時刻とタイマー設定（ネスト指摘用） ---
 const startupTime = Date.now();
 const STARTUP_GRACE_PERIOD = 60 * 1000; // 起動後5分間はネストについて言わない
@@ -400,7 +403,31 @@ export function activate(context: vscode.ExtensionContext) {
 
   if (vscode.window.activeTextEditor) {
     updateDecorations(vscode.window.activeTextEditor);
-  }
+  };
+
+  const gitExtension = vscode.extensions.getExtension<any>('vscode.git')?.exports;
+    if (gitExtension) {
+        const git = gitExtension.getAPI(1);
+
+        // リポジトリが開かれた時の処理
+        git.onDidOpenRepository((repo: any) => {
+            // コミット入力欄の変化を監視
+            repo.inputBox.onDidChange(async (value: string) => {
+                if (value.trim() === "") return;
+
+                // Conventional Commitに適合しているかチェック
+                const isValid = CONVENTIONAL_COMMIT_REGEX.test(value);
+
+                if (!isValid) {
+                    // 形式が違う場合：激怒演出
+                    mascotProvider.updateMood(true); // 激怒画像へ
+                    const angryMsg = "ねぇ、そのコミットメッセージなに…？適当すぎない？Conventional Commitも守れないなら、もう何も送らないで。";
+                    mascotProvider.updateMessage(angryMsg);
+                    await changeWindowColor(true); // 画面を赤く
+                } 
+            });
+        });
+    }
 }
 
 export function deactivate() { }
