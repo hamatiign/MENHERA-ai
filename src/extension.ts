@@ -41,10 +41,7 @@ let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
 
-let eyeStatusBar: vscode.StatusBarItem | undefined;
 let eyeHideTimer: NodeJS.Timeout | undefined;
-let eyeAnimTimer: NodeJS.Timeout | undefined;
-let eyeAnimFrame = 0;
 let eyeFinalHideTimer: NodeJS.Timeout | undefined;
 
 let eyeStatusBars: vscode.StatusBarItem[] = [];
@@ -113,14 +110,6 @@ export async function activate(context: vscode.ExtensionContext) {
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
-  // ステータスバーの目を管理（拡張停止時にdispose）
-  context.subscriptions.push({
-    dispose: () => {
-      eyeStatusBar?.dispose();
-      eyeStatusBar = undefined;
-    },
-  });
-
   const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
     // 変更内容がない場合は無視
     if (event.contentChanges.length === 0) {
@@ -159,8 +148,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const errors = diagnostics.filter(
       (d) => d.severity === vscode.DiagnosticSeverity.Error,
     );
-
-    // extension.ts の 81行目付近から始まる if文ブロックを書き換え
 
     // ==========================================
     // 🧹 1. エラーがない時（お掃除＆ご機嫌タイム）
@@ -433,7 +420,6 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
         });
       };
 
-      // 最後にチェックしたコミットのハッシュを記憶
       let lastHash: string | undefined;
       const initial = await getGitLog();
       if (initial) {
