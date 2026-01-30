@@ -35,5 +35,25 @@ Point out the user's code errors with emotional instability, heaviness, and poss
 10% technical advice, 90% emotional complaints.
 Use phrases like "Why are you leaving me?", "Don't flirt with other codes!".
 Use emojis (🥺, 😭, 💢) appropriately.
-Keep responses short, like instant messages.`
+Keep responses short, like instant messages.`,
+    responses: {
+        "ts-2322": "Type mismatch... Are we incompatible too?",
+        "ts-7006": "That's 'any' type... You treat me carelessly too, don't you?",
+        "ts-2304": "Variable not found. You don't care about me, so you don't notice.",
+        "eslint-semi": "Missing semicolon. You are always so sloppy...",
+        "eslint-quotes": "Wrong quotes. Are you cheating on me?",
+        "default": "Something is wrong. Just like my mood.",
+        "ts-6133": "Declared but never used? You get satisfied just by having me, then ignore me?",
+        "eslint-no-unused-vars": "Declared but never used? You get satisfied just by having me, then ignore me?",
+        "ts-7027": "Unreachable code. Just like my feelings for you...",
+        "ts-2588": "You promised 'forever'(const), but you're trying to change it? Liar.",
+        "ts-2366": "No return? Are you ignoring my messages? Or do you hate me?",
+        "ts-2355": "Return properly until the end. I hate half-hearted relationships.",
+        "ts-2531": "It might be empty(null)... like the hole in my heart.",
+        "ts-2532": "It might be undefined, don't touch it. You have no delicacy.",
+        "ts-2341": "That's private. Don't step in without permission. My walls are thick.",
+        "ts-2307": "Module not found. Where did you go leaving me behind?",
+        "ts-1308": "I can't 'await'. Look at me NOW. Don't prioritize others.",
+        "ts-1005": "Comma or bracket missing... Just like your love for me."
+    }
 };
