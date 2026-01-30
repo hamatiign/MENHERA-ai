@@ -12,6 +12,9 @@ import {
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
 
+// conventional commit のリスト
+const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+/;
+
 // --- 起動時刻とタイマー設定（ネスト指摘用） ---
 const startupTime = Date.now();
 const STARTUP_GRACE_PERIOD = 60 * 1000; // 起動後5分間はネストについて言わない
@@ -95,7 +98,7 @@ function showEyeWhileTyping() {
   }, 5000);
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
 
   // マスコット表示（サイドバー）
@@ -143,7 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
-    const angerThreshold = config.get<number>("angerThreshold", 5); 
+    const angerThreshold = config.get<number>("angerThreshold", 5);
     const enableVoice = config.get<boolean>("enableVoice", true);
     const checkDelay = config.get<number>("checkDelay", 2000); // デフォルト2秒
     const enableCheckOnEdit = config.get<boolean>("enableCheckOnEdit", true);
@@ -241,14 +244,14 @@ export function activate(context: vscode.ExtensionContext) {
         await changeWindowColor(true);
         vscode.window.showErrorMessage("エラー直してくれないから...ね？");
 
-        if(enableVoice){
-        const audioPath = path.join(
-          context.extensionPath,
-          "audio",
-          "first-letter-voice-ver2.wav",
-        );
-        playAudio(audioPath);
-      }
+        if (enableVoice) {
+          const audioPath = path.join(
+            context.extensionPath,
+            "audio",
+            "first-letter-voice-ver2.wav",
+          );
+          playAudio(audioPath);
+        }
 
         runPunishmentLogic(
           workspaceFolders,
@@ -262,14 +265,14 @@ export function activate(context: vscode.ExtensionContext) {
         stagnationTimeout = setTimeout(async () => {
           vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
 
-          if(enableVoice){
-          const audioPath = path.join(
-            context.extensionPath,
-            "audio",
-            "second-letter-voice.wav",
-          );
-          playAudio(audioPath);
-        }
+          if (enableVoice) {
+            const audioPath = path.join(
+              context.extensionPath,
+              "audio",
+              "second-letter-voice.wav",
+            );
+            playAudio(audioPath);
+          }
           await runPunishmentLogic(
             workspaceFolders,
             "まだ直さないの.txt",
@@ -400,6 +403,72 @@ export function activate(context: vscode.ExtensionContext) {
 
   if (vscode.window.activeTextEditor) {
     updateDecorations(vscode.window.activeTextEditor);
+  };
+
+const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
+  
+  if (gitExtension) {
+    if (!gitExtension.isActive) {
+      await gitExtension.activate();
+    }
+    
+    const git = gitExtension.exports.getAPI(1);
+    console.log("メンヘラAI: Git APIを取得したよ");
+
+    const setupRepo = async (repo: any) => {
+      console.log("メンヘラAI: 監視を開始したよ:", repo.rootUri.fsPath);
+      
+      const getGitLog = (): Promise<{ hash: string, message: string } | null> => {
+        return new Promise((resolve) => {
+          cp.exec('git log -1 --pretty=format:"%H%n%B"', { cwd: repo.rootUri.fsPath }, (error, stdout) => {
+            if (error || !stdout) {
+              resolve(null);
+              return;
+            }
+            const lines = stdout.split('\n');
+            const hash = lines[0].trim();
+            const message = lines.slice(1).join('\n').trim();
+            resolve({ hash, message });
+          });
+        });
+      };
+
+      // 最後にチェックしたコミットのハッシュを記憶
+      let lastHash: string | undefined;
+      const initial = await getGitLog();
+      if (initial) {
+        lastHash = initial.hash;
+      }
+
+      // リポジトリの状態（HEADの移動など）が変わるたびに呼ばれる
+      repo.state.onDidChange(async () => {
+        const current = await getGitLog();
+        if (!current) { return; }
+
+        if (current.hash !== lastHash) {
+
+          lastHash = current.hash;
+          const message = current.message;
+
+          const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
+
+          // 判定
+          if (!isValid) {
+            mascotProvider.updateMood(true);
+            const firstLine = message.split('\n')[0];
+            mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
+            await changeWindowColor(true);
+            vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
+          } else {
+            mascotProvider.updateMood(false);
+            await changeWindowColor(false);
+          }
+        }
+      });
+    };
+
+    git.repositories.forEach(setupRepo);
+    git.onDidOpenRepository(setupRepo);
   }
 }
 
