@@ -445,27 +445,21 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
         const current = await getGitLog();
         if (!current) { return; }
 
-        // ハッシュが存在し、かつ前回のチェック時から変わっている場合（＝新しいコミット）
         if (current.hash !== lastHash) {
-          console.log("メンヘラAI: 状態の変化を検知したよ");
 
-          // ここでハッシュを更新して「処理済み」とする
           lastHash = current.hash;
           const message = current.message;
-          console.log(`メンヘラAI: 判定中... 「${message.split('\n')[0]}」`);
 
           const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
 
+          // 判定
           if (!isValid) {
-            // 演出開始
             mascotProvider.updateMood(true);
             const firstLine = message.split('\n')[0];
             mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
             await changeWindowColor(true);
             vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
           } else {
-            // 形式が合っていれば機嫌を直す
-            console.log("メンヘラAI: ちゃんと書けてるね。えらいえらい。");
             mascotProvider.updateMood(false);
             await changeWindowColor(false);
           }
