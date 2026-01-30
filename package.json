@@ -19,6 +19,7 @@
     "vscode.git"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:typescript",
     "onLanguage:javascript",
     "onLanguage:typescriptreact",

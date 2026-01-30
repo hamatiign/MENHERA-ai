@@ -98,7 +98,7 @@ function showEyeWhileTyping() {
   }, 5000);
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
 
   // マスコット表示（サイドバー）
@@ -405,55 +405,76 @@ export function activate(context: vscode.ExtensionContext) {
     updateDecorations(vscode.window.activeTextEditor);
   };
 
-  const gitExtension = vscode.extensions.getExtension<any>('vscode.git')?.exports;
+const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
+  
   if (gitExtension) {
-    const git = gitExtension.getAPI(1);
+    if (!gitExtension.isActive) {
+      await gitExtension.activate();
+    }
+    
+    const git = gitExtension.exports.getAPI(1);
+    console.log("メンヘラAI: Git APIを取得したよ");
 
-    // リポジトリが開かれた時の処理
-    git.onDidOpenRepository((repo: any) => {
-      // コミット入力欄の変化を監視
-      repo.inputBox.onDidChange(async (value: string) => {
-        if (value.trim() === "") return;
+    const setupRepo = async (repo: any) => {
+      console.log("メンヘラAI: 監視を開始したよ:", repo.rootUri.fsPath);
+      
+      const getGitLog = (): Promise<{ hash: string, message: string } | null> => {
+        return new Promise((resolve) => {
+          cp.exec('git log -1 --pretty=format:"%H%n%B"', { cwd: repo.rootUri.fsPath }, (error, stdout) => {
+            if (error || !stdout) {
+              resolve(null);
+              return;
+            }
+            const lines = stdout.split('\n');
+            const hash = lines[0].trim();
+            const message = lines.slice(1).join('\n').trim();
+            resolve({ hash, message });
+          });
+        });
+      };
 
-        // Conventional Commitに適合しているかチェック
-        const isValid = CONVENTIONAL_COMMIT_REGEX.test(value);
+      // 最後にチェックしたコミットのハッシュを記憶
+      let lastHash: string | undefined;
+      const initial = await getGitLog();
+      if (initial) {
+        lastHash = initial.hash;
+      }
 
-        if (!isValid) {
-          // 形式が違う場合：激怒演出
-          mascotProvider.updateMood(true); // 激怒画像へ
-          const angryMsg = "ねぇ、そのコミットメッセージなに…？適当すぎない？Conventional Commitも守れないなら、もう何も送らないで。";
-          mascotProvider.updateMessage(angryMsg);
-          await changeWindowColor(true); // 画面を赤く
-        }
-      });
-          
-      repo.onDidCommit(async () => {
-        // 状態更新のタイムラグを考慮して少し待つ
-        await new Promise(resolve => setTimeout(resolve, 300));
+      // リポジトリの状態（HEADの移動など）が変わるたびに呼ばれる
+      repo.state.onDidChange(async () => {
+        const current = await getGitLog();
+        if (!current) { return; }
 
-        const lastCommit = repo.state.HEAD?.commit;
-        if (!lastCommit) return;
+        // ハッシュが存在し、かつ前回のチェック時から変わっている場合（＝新しいコミット）
+        if (current.hash !== lastHash) {
+          console.log("メンヘラAI: 状態の変化を検知したよ");
 
-        const message = lastCommit.message;
-        const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
+          // ここでハッシュを更新して「処理済み」とする
+          lastHash = current.hash;
+          const message = current.message;
+          console.log(`メンヘラAI: 判定中... 「${message.split('\n')[0]}」`);
 
-        if (!isValid) {
-          mascotProvider.updateMood(true);
-          const firstLine = message.split('\n')[0];
-          const angryMsg = `ねぇ、さっきのコミットメッセージ（${firstLine}）なに…？適当すぎ。そんなに私のルールを破りたいの？`;
-          mascotProvider.updateMessage(angryMsg);
-          await changeWindowColor(true);
+          const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
 
-          const activeTerminal = vscode.window.activeTerminal;
-          if (activeTerminal) {
-            // \x1b[1;31m で赤文字にしている
-            const terminalAngryMsg = `echo "\n\x1b[1;31m[MENHERA-AI] ねぇ、さっきのコミット（${firstLine}）なに？\x1b[0m" && echo "\x1b[1;31m[MENHERA-AI] Conventional Commitsも守れないなら、もう何も送らないで。\x1b[0m\n"`;
-                
-            activeTerminal.sendText(terminalAngryMsg);
+          if (!isValid) {
+            // 演出開始
+            mascotProvider.updateMood(true);
+            const firstLine = message.split('\n')[0];
+            mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
+            await changeWindowColor(true);
+            vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
+          } else {
+            // 形式が合っていれば機嫌を直す
+            console.log("メンヘラAI: ちゃんと書けてるね。えらいえらい。");
+            mascotProvider.updateMood(false);
+            await changeWindowColor(false);
           }
         }
       });
-    });
+    };
+
+    git.repositories.forEach(setupRepo);
+    git.onDidOpenRepository(setupRepo);
   }
 }
 
