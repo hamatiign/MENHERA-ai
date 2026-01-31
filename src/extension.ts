@@ -107,6 +107,51 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   );
 
+  // --- 放置検知機能 ---
+  let idleTimer: NodeJS.Timeout | undefined;
+  let heavyIdleTimer: NodeJS.Timeout | undefined;
+  let spamInterval: NodeJS.Timeout | undefined;
+
+  const IDLE_THRESHOLD_1 = 60 * 1000; 
+  const IDLE_THRESHOLD_2 = 100 * 1000; 
+
+  const resetIdleTimer = () => {
+    if (idleTimer) { clearTimeout(idleTimer); }
+    if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
+
+    // スパムモード解除
+    if (spamInterval) {
+      clearInterval(spamInterval);
+      spamInterval = undefined;
+      mascotProvider.updateMood(false);
+      const msg = "あ、やっと動いた。もう...どこ行ってたの？";
+      vscode.window.showInformationMessage(msg);
+      mascotProvider.updateMessage(msg);
+    }
+
+    // 第1段階: 生存確認
+    idleTimer = setTimeout(() => {
+      const msg = "え...生きてる？";
+      vscode.window.showInformationMessage(msg);
+      mascotProvider.updateMessage(msg);
+    }, IDLE_THRESHOLD_1);
+
+    // 第2段階: 大量通知（スパム）
+    heavyIdleTimer = setTimeout(() => {
+      mascotProvider.updateMood(true);
+      const spamMessages = ["ねぇ", "どこ？", "無視？", "ねぇねぇ", "おーい", "死んじゃったの？", "捨てられた？", "返事して", "ねぇってば"];
+      
+      spamInterval = setInterval(() => {
+        const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
+        vscode.window.showErrorMessage(randomMsg);
+        mascotProvider.updateMessage(randomMsg);
+      }, 2000);
+    }, IDLE_THRESHOLD_2);
+  };
+
+  // 起動時にタイマー開始
+  resetIdleTimer();
+
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
@@ -117,8 +162,15 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     // 入力中だけ、エディタに干渉しない場所(ステータスバー右側)に目を表示
     showEyeWhileTyping();
+    resetIdleTimer();
   });
   context.subscriptions.push(typeListener);
+
+  // カーソル移動や選択範囲変更も操作とみなす
+  const selectionListener = vscode.window.onDidChangeTextEditorSelection(() => {
+    resetIdleTimer();
+  });
+  context.subscriptions.push(selectionListener);
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
