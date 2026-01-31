@@ -1,4 +1,5 @@
 const chalk = require("chalk");
+chalk.level = 3;
 const gradient = require("gradient-string");
 
 export const colorThemes: any = {
@@ -78,12 +79,16 @@ export function createGradString(string: string, grad: any) {
 
 // Adds spaces to the beginning of a string to center it within an area
 export function centerString(string: string, areaLength: number) {
-    let spaces = "";
-    const numInsertSpaces = Math.ceil(areaLength - string.length) / 2;
-    for (let i = 0; i < numInsertSpaces; i++) {
-        spaces += " ";
-    }
-    return spaces + string;
+    const lines = string.split('\n');
+    const centeredLines = lines.map(line => {
+        let spaces = "";
+        const numInsertSpaces = Math.max(0, Math.ceil((areaLength - line.length) / 2));
+        for (let i = 0; i < numInsertSpaces; i++) {
+            spaces += " ";
+        }
+        return spaces + line;
+    });
+    return centeredLines.join('\n');
 }
 
 export function createGrad(colors = colorThemes.love, loops = 2) {
@@ -105,15 +110,19 @@ export function createGrad(colors = colorThemes.love, loops = 2) {
     return gradFunc(colorsRepeat);
 }
 
-export function getMenheraTerminalText(text: string, themeName: string = 'love') {
+export function getMenheraTerminalLayout(text: string, themeName: string = 'love', borderName: string = 'hearts2') {
     const colors = colorThemes[themeName] || colorThemes.love;
-    const border = borderThemes.hearts2;
+    const border = borderThemes[borderName] || borderThemes.hearts2;
     const grad = createGrad(colors, 2);
     
     const borderTop = createGradString(border[0], grad);
     const borderBottom = createGradString(border[1], grad);
     const centeredText = centerString(text, border[0].length);
-    const coloredText = createColorString(centeredText, colors[0], "bold");
 
-    return `\n${borderTop}\n${borderBottom}\n\n${coloredText}\n\n${borderBottom}\n${borderTop}\n`;
+    return {
+        header: `\n${borderTop}\n${borderBottom}\n\n`,
+        body: centeredText,
+        bodyColor: colors[0],
+        footer: `\n\n${borderBottom}\n${borderTop}\n`
+    };
 }
