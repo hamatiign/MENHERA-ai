@@ -102,19 +102,6 @@ let menheraTerminal: vscode.Terminal | undefined;
 const writeEmitter = new vscode.EventEmitter<string>();
 let isAnimating = false;
 
-function getTimeBasedGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 5) {
-    return "ねぇ、まだ寝ないの？";
-  } else if (hour < 11) {
-    return "おはよう。";
-  } else if (hour < 18) {
-    return "こんにちは。";
-  } else {
-    return "こんばんは。";
-  }
-}
-
 async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
   if (!menheraTerminal) {
     const pty: vscode.Pseudoterminal = {
@@ -143,8 +130,7 @@ async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
   try {
     const theme = mood === 'anger' ? 'spooky' : 'love';
     const border = mood === 'anger' ? 'bamboo' : 'hearts2';
-    const greeting = getTimeBasedGreeting();
-    const layout = getMenheraTerminalLayout(`${greeting}\n${message}`, theme, border);
+    const layout = getMenheraTerminalLayout(message, theme, border);
 
     writeEmitter.fire(layout.header.replace(/\n/g, '\r\n'));
 
@@ -614,6 +600,7 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
             mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
             await changeWindowColor(true);
             vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
+            showMenheraTerminal(`ねぇ、さっきのコミット...\n"${firstLine}" ってなに？\n適当すぎ。ちゃんと書いてよ。`, 'anger');
           } else {
             mascotProvider.updateMood(false);
             await changeWindowColor(false);

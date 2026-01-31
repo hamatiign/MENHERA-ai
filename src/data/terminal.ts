@@ -1,5 +1,6 @@
 const chalk = require("chalk");
 chalk.level = 3;
+process.env.FORCE_COLOR = '3';
 const gradient = require("gradient-string");
 
 export const colorThemes: any = {
@@ -15,6 +16,7 @@ export const colorThemes: any = {
     mono: ["#EDEDED", "#A6A6A6", "#757575", "#C8CCC8", "#474747"],
     white: ["#ffff"],
     grey: ["#C8CCC8"],
+    sadness: ["#a7d7f1", "#87A9FA", "#757575", "#a7d7f1", "#FFFFFF"],
 };
 
 export const borderThemes: any = {
@@ -65,6 +67,14 @@ export const borderThemes: any = {
     dotty: [
         ` ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' ':' '`,
         `.: :.: :.: .:. .:. .:: :.: :.: ::. .:. .:. :.: :.: :.: .:. .:. .:: :.: :.:`,
+    ],
+    tears: [
+        `💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧`,
+        `  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  💧  `,
+    ],
+    chains: [
+        `x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-`,
+        `-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x`,
     ],
 };
 
