@@ -11,6 +11,8 @@ import {
 } from "@google/generative-ai";
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
+import { gzip } from "zlib";
+import { getMenheraTerminalText } from "./data/terminal";
 
 // conventional commit のリスト
 const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+/;
@@ -95,8 +97,43 @@ function showEyeWhileTyping() {
   }, 5000);
 }
 
+// メンヘラターミナルの管理
+let menheraTerminal: vscode.Terminal | undefined;
+const writeEmitter = new vscode.EventEmitter<string>();
+
+function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
+  const theme = mood === 'anger' ? 'spooky' : 'love';
+  // terminal.ts 内の getMenheraTerminalText を使用して装飾テキストを取得
+  const art = getMenheraTerminalText(message, theme);
+  
+  // ターミナルの改行コード(\r\n)に変換
+  const formattedArt = '\r\n' + art.replace(/\n/g, '\r\n') + '\r\n\r\n';
+
+  if (!menheraTerminal) {
+    const pty: vscode.Pseudoterminal = {
+      onDidWrite: writeEmitter.event,
+      open: () => {
+        // ターミナルが開いた瞬間に装飾テキストを書き込む
+        writeEmitter.fire(formattedArt);
+      },
+      close: () => { 
+        menheraTerminal = undefined; 
+      },
+      handleInput: (data) => {
+        if (data === '\r') { writeEmitter.fire('\r\n'); }
+      }
+    };
+    menheraTerminal = vscode.window.createTerminal({ name: "Menhera AI", pty });
+  } else {
+    writeEmitter.fire(formattedArt);
+  }
+  
+  menheraTerminal.show(true);
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
+  showMenheraTerminal("メンヘラAIが起動しました...\nずっと見てるからね。", 'love');
 
   // マスコット表示（サイドバー）
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
@@ -282,6 +319,7 @@ export async function activate(context: vscode.ExtensionContext) {
         hasPunished = true;
         await changeWindowColor(true);
         vscode.window.showErrorMessage("エラー直してくれないから...ね？");
+        showMenheraTerminal("エラー多すぎ...\n私のこと嫌いなの？", 'anger');
 
         if (enableVoice) {
           const audioPath = path.join(
@@ -510,7 +548,11 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
   }
 }
 
-export function deactivate() { }
+export function deactivate() {
+  if (menheraTerminal) {
+    menheraTerminal.dispose();
+  }
+}
 
 // ヘルパー関数たち
 const GetJsonKey = (error: vscode.Diagnostic) => {
