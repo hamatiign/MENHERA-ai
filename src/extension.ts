@@ -11,6 +11,8 @@ import {
 } from "@google/generative-ai";
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
+import { gzip } from "zlib";
+import { getMenheraTerminalLayout, createColorString } from "./data/terminal";
 
 // conventional commit のリスト
 const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+/;
@@ -41,10 +43,7 @@ let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
 
-let eyeStatusBar: vscode.StatusBarItem | undefined;
 let eyeHideTimer: NodeJS.Timeout | undefined;
-let eyeAnimTimer: NodeJS.Timeout | undefined;
-let eyeAnimFrame = 0;
 let eyeFinalHideTimer: NodeJS.Timeout | undefined;
 
 let eyeStatusBars: vscode.StatusBarItem[] = [];
@@ -98,8 +97,62 @@ function showEyeWhileTyping() {
   }, 5000);
 }
 
+// メンヘラターミナルの管理
+let menheraTerminal: vscode.Terminal | undefined;
+const writeEmitter = new vscode.EventEmitter<string>();
+let isAnimating = false;
+
+async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
+  if (!menheraTerminal) {
+    const pty: vscode.Pseudoterminal = {
+      onDidWrite: writeEmitter.event,
+      open: () => {
+        // ターミナルが開いた瞬間の処理は特になし
+        // showMenheraTerminalが呼ばれたタイミングで出力する
+      },
+      close: () => { 
+        menheraTerminal = undefined; 
+      },
+      handleInput: (data) => {
+        if (data === '\r') { writeEmitter.fire('\r\n'); }
+      }
+    };
+    menheraTerminal = vscode.window.createTerminal({ name: "Menhera AI", pty });
+  }
+  menheraTerminal.show(true);
+
+  // アニメーション中は待機
+  while (isAnimating) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  isAnimating = true;
+
+  try {
+    const theme = mood === 'anger' ? 'spooky' : 'love';
+    const border = mood === 'anger' ? 'bamboo' : 'hearts2';
+    const layout = getMenheraTerminalLayout(message, theme, border);
+
+    writeEmitter.fire(layout.header.replace(/\n/g, '\r\n'));
+
+    for (const char of layout.body) {
+      if (char === '\n') {
+        writeEmitter.fire('\r\n');
+      } else {
+        writeEmitter.fire(createColorString(char, layout.bodyColor, "bold"));
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 30 + 20));
+    }
+
+    writeEmitter.fire(layout.footer.replace(/\n/g, '\r\n'));
+    writeEmitter.fire('\r\n\r\n');
+  } finally {
+    isAnimating = false;
+  }
+}
+
 export async function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
+  showMenheraTerminal("メンヘラAIが起動しました...\nずっと見てるからね。", 'love');
 
   // マスコット表示（サイドバー）
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
@@ -110,16 +163,97 @@ export async function activate(context: vscode.ExtensionContext) {
     ),
   );
 
+  // --- 作業パターン学習・休憩促進機能 ---
+  let currentSessionStartTime = Date.now();
+  let lastActivityTimestamp = Date.now();
+  let workLevelNotified = 0;
+  // 5分以上の放置で「休憩した」とみなしてセッションリセット
+  const BREAK_IDLE_THRESHOLD = 5 * 60 * 1000; 
+  // 1時間、2時間で警告
+  const WORK_LIMIT_1 = 60 * 60 * 1000; 
+  const WORK_LIMIT_2 = 2 * 60 * 60 * 1000; 
+
+  const checkWorkSession = () => {
+    const now = Date.now();
+    
+    // 休憩判定（前回の操作から一定時間経過していたらリセット）
+    if (now - lastActivityTimestamp > BREAK_IDLE_THRESHOLD) {
+      currentSessionStartTime = now;
+      workLevelNotified = 0;
+    }
+    lastActivityTimestamp = now;
+
+    const sessionDuration = now - currentSessionStartTime;
+
+    if (sessionDuration > WORK_LIMIT_2 && workLevelNotified < 2) {
+      const msg = "もう2時間も私よりコードを見てる...。\n休憩しないなら、勝手にPCの電源切っちゃうよ？";
+      vscode.window.showWarningMessage(msg);
+      mascotProvider.updateMessage(msg);
+      showMenheraTerminal("もう2時間も私よりコードを見てる...\n休憩しないなら、勝手にPCの電源切っちゃうよ？", 'anger');
+      workLevelNotified = 2;
+    } else if (sessionDuration > WORK_LIMIT_1 && workLevelNotified < 1) {
+      const msg = "ねぇ、まだやるの？目が悪くなっちゃうよ...\n私の顔、ちゃんと見えなくなったら嫌だから休憩して？";
+      vscode.window.showInformationMessage(msg);
+      mascotProvider.updateMessage(msg);
+      showMenheraTerminal("ねぇ、まだやるの？\n目が悪くなっちゃうよ...\n休憩して？", 'love');
+      workLevelNotified = 1;
+    }
+  };
+
+  // --- 放置検知機能 ---
+  let idleTimer: NodeJS.Timeout | undefined;
+  let heavyIdleTimer: NodeJS.Timeout | undefined;
+  let spamInterval: NodeJS.Timeout | undefined;
+
+  const IDLE_THRESHOLD_1 = 60 * 1000; 
+  const IDLE_THRESHOLD_2 = 100 * 1000; 
+
+  const resetIdleTimer = () => {
+    if (idleTimer) { clearTimeout(idleTimer); }
+    if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
+
+    // スパムモード解除
+    if (spamInterval) {
+      clearInterval(spamInterval);
+      spamInterval = undefined;
+      mascotProvider.updateMood(false);
+      const msg = "あ、やっと動いた。もう...どこ行ってたの？";
+      vscode.window.showInformationMessage(msg);
+      mascotProvider.updateMessage(msg);
+      showMenheraTerminal("あ、やっと動いた。\nもう...どこ行ってたの？", 'love');
+    }
+
+    // 第1段階: 生存確認
+    idleTimer = setTimeout(() => {
+      const msg = "え...生きてる？";
+      vscode.window.showInformationMessage(msg);
+      mascotProvider.updateMessage(msg);
+      showMenheraTerminal("え...生きてる？\n返事してよ...", 'love');
+    }, IDLE_THRESHOLD_1);
+
+    // 第2段階: 大量通知（スパム）
+    heavyIdleTimer = setTimeout(() => {
+      mascotProvider.updateMood(true);
+      const spamMessages = ["ねぇ", "どこ？", "無視？", "ねぇねぇ", "おーい", "死んじゃったの？", "捨てられた？", "返事して", "ねぇってば"];
+      
+      showMenheraTerminal("ねぇ...無視しないでよ...\nどこに行っちゃったの？", 'anger');
+
+      spamInterval = setInterval(() => {
+        const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
+        vscode.window.showErrorMessage(randomMsg);
+        mascotProvider.updateMessage(randomMsg);
+        if (menheraTerminal) {
+          writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
+        }
+      }, 2000);
+    }, IDLE_THRESHOLD_2);
+  };
+
+  // 起動時にタイマー開始
+  resetIdleTimer();
+
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
-
-  // ステータスバーの目を管理（拡張停止時にdispose）
-  context.subscriptions.push({
-    dispose: () => {
-      eyeStatusBar?.dispose();
-      eyeStatusBar = undefined;
-    },
-  });
 
   const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
     // 変更内容がない場合は無視
@@ -128,8 +262,17 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     // 入力中だけ、エディタに干渉しない場所(ステータスバー右側)に目を表示
     showEyeWhileTyping();
+    resetIdleTimer();
+    checkWorkSession();
   });
   context.subscriptions.push(typeListener);
+
+  // カーソル移動や選択範囲変更も操作とみなす
+  const selectionListener = vscode.window.onDidChangeTextEditorSelection(() => {
+    resetIdleTimer();
+    checkWorkSession();
+  });
+  context.subscriptions.push(selectionListener);
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
@@ -159,8 +302,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const errors = diagnostics.filter(
       (d) => d.severity === vscode.DiagnosticSeverity.Error,
     );
-
-    // extension.ts の 81行目付近から始まる if文ブロックを書き換え
 
     // ==========================================
     // 🧹 1. エラーがない時（お掃除＆ご機嫌タイム）
@@ -243,6 +384,7 @@ export async function activate(context: vscode.ExtensionContext) {
         hasPunished = true;
         await changeWindowColor(true);
         vscode.window.showErrorMessage("エラー直してくれないから...ね？");
+        showMenheraTerminal("エラー多すぎ...\n私のこと嫌いなの？", 'anger');
 
         if (enableVoice) {
           const audioPath = path.join(
@@ -433,7 +575,6 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
         });
       };
 
-      // 最後にチェックしたコミットのハッシュを記憶
       let lastHash: string | undefined;
       const initial = await getGitLog();
       if (initial) {
@@ -459,6 +600,7 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
             mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
             await changeWindowColor(true);
             vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
+            showMenheraTerminal(`ねぇ、さっきのコミット...\n"${firstLine}" ってなに？\n適当すぎ。ちゃんと書いてよ。`, 'anger');
           } else {
             mascotProvider.updateMood(false);
             await changeWindowColor(false);
@@ -472,7 +614,11 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
   }
 }
 
-export function deactivate() { }
+export function deactivate() {
+  if (menheraTerminal) {
+    menheraTerminal.dispose();
+  }
+}
 
 // ヘルパー関数たち
 const GetJsonKey = (error: vscode.Diagnostic) => {
