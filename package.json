@@ -64,6 +64,11 @@
       {
         "command": "menhera-ai.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "menheraSpam",
+        "title": "メンヘラAI: 放置演出（スパム）を発動",
+        "category": "Menhera AI"
       }
     ],
     "configuration": {
