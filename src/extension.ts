@@ -1,4 +1,4 @@
-import * as vscode from "vscode";
+fimport * as vscode from "vscode";
 import { MenheraViewProvider } from "./mascotView";
 import * as cp from "child_process";
 const say = require("say");
@@ -267,7 +267,7 @@ export async function activate(context: vscode.ExtensionContext) {
           writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
         }
       }, 500);
-     }, 3000
+     }, 3000);
     }, spamTime);
   };
 
