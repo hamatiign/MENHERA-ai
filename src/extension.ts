@@ -113,6 +113,14 @@ const writeEmitter = new vscode.EventEmitter<string>();
 let isAnimating = false;
 
 async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
+
+  const config = vscode.workspace.getConfiguration("menhera-ai");
+  const enableTerminal = config.get<boolean>("enableTerminal", true);
+  
+  if (!enableTerminal) {
+    return;
+  }
+  
   if (!menheraTerminal) {
     const pty: vscode.Pseudoterminal = {
       onDidWrite: writeEmitter.event,
@@ -218,14 +226,20 @@ export async function activate(context: vscode.ExtensionContext) {
   let heavyIdleTimer: NodeJS.Timeout | undefined;
   let spamInterval: NodeJS.Timeout | undefined;
 
-  const IDLE_THRESHOLD_1 = 60 * 1000; 
-  const IDLE_THRESHOLD_2 = 100 * 1000; 
+  // const IDLE_THRESHOLD_1 = 60 * 1000; 
+  // const IDLE_THRESHOLD_2 = 100 * 1000; 
 
   const resetIdleTimer = () => {
     if (idleTimer) { clearTimeout(idleTimer); }
     if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
 
     const i18n = getLocale();
+
+    const config = vscode.workspace.getConfiguration("menhera-ai");
+    // デフォルト: 60秒(60000ms)
+    const warningTime = config.get<number>("idleThresholdWarning", 60000);
+    // デフォルト: 100秒(100000ms) ※警告より後に設定しないとバグるので注意
+    const spamTime = config.get<number>("idleThresholdSpam", 100000);
 
     // スパムモード解除
     if (spamInterval) {
@@ -244,7 +258,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
       showMenheraTerminal(i18n.idle.alive_term, 'love');
-    }, IDLE_THRESHOLD_1);
+    }, warningTime);
 
     // 第2段階: 大量通知（スパム）
     heavyIdleTimer = setTimeout(() => {
@@ -261,7 +275,7 @@ export async function activate(context: vscode.ExtensionContext) {
           writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
         }
       }, 2000);
-    }, IDLE_THRESHOLD_2);
+    }, spamTime);
   };
 
   // 起動時にタイマー開始
@@ -389,6 +403,8 @@ if (editor.document.fileName.endsWith(i18n.letter1.filename) ||
       mascotProvider.updateMessage(i18n.mascot.angry
       );
 
+      const enableLetters = config.get<boolean>("enableLetters", true);
+
       const workspaceFolders = vscode.workspace.workspaceFolders;
 
       // A. 最初のお仕置き（即時発動）
@@ -407,8 +423,9 @@ if (editor.document.fileName.endsWith(i18n.letter1.filename) ||
           playAudio(audioPath);
         }
 
-        runPunishmentLogic(
-          workspaceFolders, i18n.letter1.filename, i18n.letter1.content);
+        if (enableLetters) {
+            runPunishmentLogic(workspaceFolders, i18n.letter1.filename, i18n.letter1.content);
+        }
       }
 
       // B. 追撃タイマー
@@ -423,7 +440,9 @@ if (editor.document.fileName.endsWith(i18n.letter1.filename) ||
             );
             playAudio(audioPath);
           }
-          await runPunishmentLogic(workspaceFolders, i18n.letter2.filename, i18n.letter2.content);
+          if (enableLetters) {
+              await runPunishmentLogic(workspaceFolders, i18n.letter2.filename, i18n.letter2.content);
+          }
           morePunished = true;
           stagnationTimeout = undefined;
         }, 30000); // 30秒後

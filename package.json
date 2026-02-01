@@ -84,7 +84,17 @@
           "default": true,
           "description": "手紙が届いた時にボイスを再生するかどうか"
         },
-        "menhera-ai.checkDelay": {
+        "menhera-ai.idleThresholdWarning": {
+          "type": "number",
+          "default": 60000,
+          "description": "生存確認（『え...生きてる？』）までの放置時間 (ミリ秒) / Time until 'Are you alive?' check (ms)"
+        },
+        "menhera-ai.idleThresholdSpam": {
+          "type": "number",
+          "default": 100000,
+          "description": "発狂（スパム通知）までの放置時間 (ミリ秒) / Time until spam attack (ms)"
+        },
+                "menhera-ai.checkDelay": {
           "type": "number",
           "default": 2000,
           "description": "入力が止まってからメンヘラチェックが走るまでの待機時間（ミリ秒）"
@@ -98,6 +108,16 @@
           "type": "boolean",
           "default": true,
           "description": "保存時にメンヘラチェックを行うかどうか"
+        },
+        "menhera-ai.enableTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "メンヘラターミナル（アスキーアートやメッセージ）を表示するかどうか / Enable Menhera Terminal output"
+        },
+        "menhera-ai.enableLetters": {
+          "type": "boolean",
+          "default": true,
+          "description": "激怒時に手紙ファイルを作成して強制表示するかどうか / Enable creating and showing letter files when angry"
         },
         "menhera-ai.language": {
           "type": "string",
