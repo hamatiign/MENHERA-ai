@@ -78,16 +78,18 @@ export const borderThemes: any = {
     ],
 };
 
+// 文字列に色とスタイル（太字など）を適用する
 export function createColorString(string: string, color: string, style: string) {
     if (style === "bold") return chalk.bold.hex(color)(string);
     else return chalk.hex(color)(string);
 }
 
+// 文字列にグラデーションを適用する
 export function createGradString(string: string, grad: any) {
     return chalk.bold(grad(string));
 }
 
-// Adds spaces to the beginning of a string to center it within an area
+// 指定された領域内で文字列を中央揃えにするためにスペースを追加する
 export function centerString(string: string, areaLength: number) {
     const lines = string.split('\n');
     const centeredLines = lines.map(line => {
@@ -101,6 +103,7 @@ export function centerString(string: string, areaLength: number) {
     return centeredLines.join('\n');
 }
 
+// グラデーション関数を作成する
 export function createGrad(colors = colorThemes.love, loops = 2) {
     let colorsRepeat = [];
     let length = colors.length;
@@ -120,6 +123,7 @@ export function createGrad(colors = colorThemes.love, loops = 2) {
     return gradFunc(colorsRepeat);
 }
 
+// メンヘラターミナルのレイアウト（ヘッダー、本文、フッター）を生成する
 export function getMenheraTerminalLayout(text: string, themeName: string = 'love', borderName: string = 'hearts2') {
     const colors = colorThemes[themeName] || colorThemes.love;
     const border = borderThemes[borderName] || borderThemes.hearts2;
