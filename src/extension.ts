@@ -11,7 +11,6 @@ import {
 } from "@google/generative-ai";
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
-import { gzip } from "zlib";
 import { getMenheraTerminalLayout, createColorString } from "./data/terminal";
 
 // conventional commit のリスト
@@ -54,6 +53,7 @@ const MESSAGES = [
   "みてるからね", "みてる", "さびしい", "なにやってんの？"
 ];
 
+// ステータスバーに目のアイコンを表示するためのアイテムを作成・取得
 function ensureEyeStatusBars() {
   if (eyeStatusBars.length > 0) return eyeStatusBars;
   
@@ -69,6 +69,7 @@ function ensureEyeStatusBars() {
   return eyeStatusBars;
 }
 
+// タイピング中にステータスバーに目玉を表示・更新する機能
 function showEyeWhileTyping() {
   const items = ensureEyeStatusBars();
 
@@ -102,6 +103,7 @@ let menheraTerminal: vscode.Terminal | undefined;
 const writeEmitter = new vscode.EventEmitter<string>();
 let isAnimating = false;
 
+// メンヘラターミナルにメッセージを表示する関数
 async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
   if (!menheraTerminal) {
     const pty: vscode.Pseudoterminal = {
@@ -150,6 +152,7 @@ async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
   }
 }
 
+// 拡張機能が有効化された時に呼ばれるメイン関数
 export async function activate(context: vscode.ExtensionContext) {
   console.log("メンヘラAIが起動しました...ずっと見てるからね。");
   showMenheraTerminal("メンヘラAIが起動しました...\nずっと見てるからね。", 'love');
@@ -173,6 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const WORK_LIMIT_1 = 60 * 60 * 1000; 
   const WORK_LIMIT_2 = 2 * 60 * 60 * 1000; 
 
+  // 作業時間をチェックして休憩を促す関数
   const checkWorkSession = () => {
     const now = Date.now();
     
@@ -204,13 +208,16 @@ export async function activate(context: vscode.ExtensionContext) {
   let idleTimer: NodeJS.Timeout | undefined;
   let heavyIdleTimer: NodeJS.Timeout | undefined;
   let spamInterval: NodeJS.Timeout | undefined;
+  let spamStartTimer: NodeJS.Timeout | undefined;
 
-  const IDLE_THRESHOLD_1 = 60 * 1000; 
-  const IDLE_THRESHOLD_2 = 100 * 1000; 
+  const IDLE_THRESHOLD_1 = 10 * 1000; 
+  const IDLE_THRESHOLD_2 = 20 * 1000; 
 
+  // 放置タイマーをリセットし、放置検知時の処理を設定する関数
   const resetIdleTimer = () => {
     if (idleTimer) { clearTimeout(idleTimer); }
     if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
+    if (spamStartTimer) { clearTimeout(spamStartTimer); }
 
     // スパムモード解除
     if (spamInterval) {
@@ -238,14 +245,16 @@ export async function activate(context: vscode.ExtensionContext) {
       
       showMenheraTerminal("ねぇ...無視しないでよ...\nどこに行っちゃったの？", 'anger');
 
-      spamInterval = setInterval(() => {
-        const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
-        vscode.window.showErrorMessage(randomMsg);
-        mascotProvider.updateMessage(randomMsg);
-        if (menheraTerminal) {
-          writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
-        }
-      }, 2000);
+      spamStartTimer = setTimeout(() => {
+        spamInterval = setInterval(() => {
+          const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
+          vscode.window.showErrorMessage(randomMsg);
+          mascotProvider.updateMessage(randomMsg);
+          if (menheraTerminal) {
+            writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
+          }
+        }, 500);
+      }, 3000);
     }, IDLE_THRESHOLD_2);
   };
 
@@ -255,6 +264,7 @@ export async function activate(context: vscode.ExtensionContext) {
   // 診断（赤波線）の監視用タイマー
   let timeout: NodeJS.Timeout | undefined = undefined;
 
+  // テキスト変更時のイベントリスナー（タイピング監視）
   const typeListener = vscode.workspace.onDidChangeTextDocument((event) => {
     // 変更内容がない場合は無視
     if (event.contentChanges.length === 0) {
@@ -274,6 +284,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(selectionListener);
 
+  // エディタの装飾（ゴーストテキストやメンヘラメッセージ）を更新する関数
   const updateDecorations = async (editor: vscode.TextEditor) => {
     if (!editor) {
       return;
@@ -477,6 +488,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   };
 
+  // 「Hello World」コマンド（メンヘラ挨拶）
   const helloWorldCommand = vscode.commands.registerCommand(
     "menhera-ai.helloWorld",
     () => {
@@ -495,7 +507,7 @@ export async function activate(context: vscode.ExtensionContext) {
           "ファイル開いてないじゃん…私のこと無視する気？信じられない...";
         vscode.window.showErrorMessage(errorMsg);
         say.speak(errorMsg, null, 1.0);
-        // エラー時は強制的に激怒モードにしてみる
+        // エラー時は強制的に激怒モードに
         mascotProvider.updateMood(true);
         mascotProvider.updateMessage(errorMsg);
       }
@@ -503,7 +515,37 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(helloWorldCommand);
 
-  // 診断変更イベント
+  // 放置演出（スパムモード）を強制的に発動するコマンド
+  const triggerSpamCommand = vscode.commands.registerCommand(
+    "menheraSpam",
+    () => {
+      // 既存のタイマーをリセットして重複を防ぐ
+      if (idleTimer) { clearTimeout(idleTimer); }
+      if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
+      if (spamStartTimer) { clearTimeout(spamStartTimer); }
+      if (spamInterval) { clearInterval(spamInterval); }
+
+      // スパムモード開始
+      mascotProvider.updateMood(true);
+      const spamMessages = ["ねぇ", "どこ？", "無視？", "ねぇねぇ", "おーい", "死んじゃったの？", "捨てられた？", "返事して", "ねぇってば"];
+      
+      showMenheraTerminal("ねぇ...無視しないでよ...\nどこに行っちゃったの？", 'anger');
+
+      spamStartTimer = setTimeout(() => {
+        spamInterval = setInterval(() => {
+          const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
+          vscode.window.showErrorMessage(randomMsg);
+          mascotProvider.updateMessage(randomMsg);
+          if (menheraTerminal) {
+            writeEmitter.fire(`\r\n> ${randomMsg}\r\n`);
+          }
+        }, 1500);
+      }, 1000);
+    }
+  );
+  context.subscriptions.push(triggerSpamCommand);
+
+  // 診断（エラー）変更イベントの監視
   const diagnosticDisposable = vscode.languages.onDidChangeDiagnostics(
     (event) => {
       const editor = vscode.window.activeTextEditor;
@@ -547,6 +589,7 @@ export async function activate(context: vscode.ExtensionContext) {
     updateDecorations(vscode.window.activeTextEditor);
   };
 
+// Git拡張機能との連携（コミットメッセージ監視）
 const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
   
   if (gitExtension) {
@@ -614,6 +657,7 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
   }
 }
 
+// 拡張機能が無効化された時の処理
 export function deactivate() {
   if (menheraTerminal) {
     menheraTerminal.dispose();
@@ -621,6 +665,7 @@ export function deactivate() {
 }
 
 // ヘルパー関数たち
+// エラー情報からJSONのキーを生成する
 const GetJsonKey = (error: vscode.Diagnostic) => {
   const source = error.source ? error.source.toLowerCase() : "unknown";
   let codeString = "unknown";
@@ -632,6 +677,7 @@ const GetJsonKey = (error: vscode.Diagnostic) => {
   return `${source}-${codeString}`;
 };
 
+// VSCodeのウィンドウカラーを変更する（激怒モード用）
 const changeWindowColor = async (isAngry: boolean) => {
   const config = vscode.workspace.getConfiguration();
   if (isAngry) {
@@ -655,6 +701,7 @@ const changeWindowColor = async (isAngry: boolean) => {
   }
 };
 
+// エディタにタイプライター風に文字を入力する演出
 async function typeWriter(editor: vscode.TextEditor, text: string) {
   for (let i = 0; i < text.length; i++) {
     if (editor.document.isClosed) {
@@ -671,6 +718,7 @@ async function typeWriter(editor: vscode.TextEditor, text: string) {
   await editor.document.save();
 }
 
+// お仕置きロジック（新しいファイルを作成してメッセージを書き込む）
 async function runPunishmentLogic(
   workspaceFolders: readonly vscode.WorkspaceFolder[],
   fileName: string,
@@ -718,7 +766,7 @@ async function runPunishmentLogic(
   }
 }
 
-// メンヘラAIが生成した手紙ファイルを削除し、タブを閉じる
+// メンヘラAIが生成した手紙ファイルを削除し、タブを閉じるクリーンアップ処理
 async function cleanupLetterFiles(rootPath: vscode.Uri) {
   const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
 
@@ -746,6 +794,7 @@ async function cleanupLetterFiles(rootPath: vscode.Uri) {
   }
 }
 
+// Gemini APIを使用してエラーメッセージに対するメンヘラな反応を生成する
 const CreateMessage = async (
   targetError: vscode.Diagnostic,
   apiKey: string,

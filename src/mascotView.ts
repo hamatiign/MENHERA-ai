@@ -6,6 +6,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _extensionUri: vscode.Uri) { }
 
+    // Webviewの初期化とHTMLの設定
     public resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
 
@@ -17,21 +18,21 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
     }
 
-    // メッセージ更新
+    // マスコットの吹き出しメッセージを更新する
     public updateMessage(message: string) {
         if (this._view) {
             this._view.webview.postMessage({ type: 'updateText', text: message });
         }
     }
 
-    // ▼▼▼ 追加：表情（モード）を変える機能 ▼▼▼
+    // マスコットの表情（モード）を切り替える（通常/激怒）
     public updateMood(isAngry: boolean) {
         if (this._view) {
             this._view.webview.postMessage({ type: 'updateMood', isAngry: isAngry });
         }
     }
-    // ▲▲▲▲▲▲
 
+    // Webviewに表示するHTMLコンテンツを生成する
     private _getHtmlForWebview(webview: vscode.Webview) {
         // 通常画像のパス
         const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
