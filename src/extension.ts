@@ -9,9 +9,23 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
+<<<<<<< HEAD
 import { MENHERA_PROMPT } from "./prompt";
 import responsesData from "./data/responses.json";
+=======
+import { locales, defaultLocale, Locale } from "./locales";
+import { gzip } from "zlib";
+>>>>>>> bdabc4d83bdd2bfc37812103830a86121213b1cf
 import { getMenheraTerminalLayout, createColorString } from "./data/terminal";
+
+function getLocale(): Locale {
+    const config = vscode.workspace.getConfiguration("menhera-ai");
+    const lang = config.get<string>("language", "ja");
+    // @ts-ignore
+    return locales[lang] || defaultLocale;
+}
+
+
 
 // conventional commit のリスト
 const CONVENTIONAL_COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?: .+/;
@@ -37,7 +51,7 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
 
 const hoverDecorationType = vscode.window.createTextEditorDecorationType({});
 
-const responses: { [key: string]: string } = responsesData;
+
 let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
@@ -73,9 +87,11 @@ function ensureEyeStatusBars() {
 function showEyeWhileTyping() {
   const items = ensureEyeStatusBars();
 
+  const i18n = getLocale();
+
   // タイピングのたびにメッセージの配置をシャッフル（点滅ではなく、内容が入れ替わる程度）
   items.forEach((item, index) => {
-    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % MESSAGES.length];
+    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % i18n.eyeMessages.length];
     item.text = `$(eye) ${msg}`;
     item.show();
   });
@@ -154,11 +170,13 @@ async function showMenheraTerminal(message: string, mood: 'love' | 'anger') {
 
 // 拡張機能が有効化された時に呼ばれるメイン関数
 export async function activate(context: vscode.ExtensionContext) {
-  console.log("メンヘラAIが起動しました...ずっと見てるからね。");
+  const i18n = getLocale();
+  console.log(i18n.startup);
   showMenheraTerminal("メンヘラAIが起動しました...\nずっと見てるからね。", 'love');
 
   // マスコット表示（サイドバー）
   const mascotProvider = new MenheraViewProvider(context.extensionUri);
+  mascotProvider.setInitialMessage(i18n.mascot.initial);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       MenheraViewProvider.viewType,
@@ -178,6 +196,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // 作業時間をチェックして休憩を促す関数
   const checkWorkSession = () => {
+    const i18n = getLocale();
     const now = Date.now();
     
     // 休憩判定（前回の操作から一定時間経過していたらリセット）
@@ -190,16 +209,16 @@ export async function activate(context: vscode.ExtensionContext) {
     const sessionDuration = now - currentSessionStartTime;
 
     if (sessionDuration > WORK_LIMIT_2 && workLevelNotified < 2) {
-      const msg = "もう2時間も私よりコードを見てる...。\n休憩しないなら、勝手にPCの電源切っちゃうよ？";
+      const msg = i18n.workSession.limit2;
       vscode.window.showWarningMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("もう2時間も私よりコードを見てる...\n休憩しないなら、勝手にPCの電源切っちゃうよ？", 'anger');
+      showMenheraTerminal(i18n.workSession.limit2_term, 'anger');
       workLevelNotified = 2;
     } else if (sessionDuration > WORK_LIMIT_1 && workLevelNotified < 1) {
-      const msg = "ねぇ、まだやるの？目が悪くなっちゃうよ...\n私の顔、ちゃんと見えなくなったら嫌だから休憩して？";
+      const msg = i18n.workSession.limit1;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("ねぇ、まだやるの？\n目が悪くなっちゃうよ...\n休憩して？", 'love');
+      showMenheraTerminal(i18n.workSession.limit1_term, 'love');
       workLevelNotified = 1;
     }
   };
@@ -219,31 +238,33 @@ export async function activate(context: vscode.ExtensionContext) {
     if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
     if (spamStartTimer) { clearTimeout(spamStartTimer); }
 
+    const i18n = getLocale();
+
     // スパムモード解除
     if (spamInterval) {
       clearInterval(spamInterval);
       spamInterval = undefined;
       mascotProvider.updateMood(false);
-      const msg = "あ、やっと動いた。もう...どこ行ってたの？";
+      const msg = i18n.idle.welcomeBack;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("あ、やっと動いた。\nもう...どこ行ってたの？", 'love');
+      showMenheraTerminal(i18n.idle.welcomeBack_term, 'love');  
     }
 
     // 第1段階: 生存確認
     idleTimer = setTimeout(() => {
-      const msg = "え...生きてる？";
+      const msg = i18n.idle.alive;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("え...生きてる？\n返事してよ...", 'love');
+      showMenheraTerminal(i18n.idle.alive_term, 'love');
     }, IDLE_THRESHOLD_1);
 
     // 第2段階: 大量通知（スパム）
     heavyIdleTimer = setTimeout(() => {
       mascotProvider.updateMood(true);
-      const spamMessages = ["ねぇ", "どこ？", "無視？", "ねぇねぇ", "おーい", "死んじゃったの？", "捨てられた？", "返事して", "ねぇってば"];
+      const spamMessages = i18n.idle.spamList;
       
-      showMenheraTerminal("ねぇ...無視しないでよ...\nどこに行っちゃったの？", 'anger');
+      showMenheraTerminal(i18n.idle.spam_term, 'anger');
 
       spamStartTimer = setTimeout(() => {
         spamInterval = setInterval(() => {
@@ -286,17 +307,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // エディタの装飾（ゴーストテキストやメンヘラメッセージ）を更新する関数
   const updateDecorations = async (editor: vscode.TextEditor) => {
+
     if (!editor) {
       return;
     }
-
+    const i18n = getLocale();
     // 自分が出した手紙（と追撃手紙）には反応しないようにする
-    if (
-      editor.document.fileName.endsWith("私からの手紙.txt") ||
-      editor.document.fileName.endsWith("まだ直さないの.txt")
-    ) {
-      return;
-    }
+if (editor.document.fileName.endsWith(i18n.letter1.filename) || 
+    editor.document.fileName.endsWith(i18n.letter2.filename)) {
+    return;
+        }
 
     const config = vscode.workspace.getConfiguration("menhera-ai");
     const apiKey = config.get<string>("apiKey");
@@ -332,13 +352,12 @@ export async function activate(context: vscode.ExtensionContext) {
       // 手紙ファイルを削除する処理
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (workspaceFolders) {
-        await cleanupLetterFiles(workspaceFolders[0].uri);
+      await cleanupLetterFiles(workspaceFolders[0].uri, i18n);
 
         // 激怒後なら「許してあげる」メッセージ
         if (hasPunished || morePunished) {
-          const msg = "機嫌なおったから、手紙全部捨てといたよ！";
-          vscode.window.showInformationMessage(msg);
-          mascotProvider.updateMessage(msg);
+                vscode.window.showInformationMessage(i18n.cleanup); // 翻訳
+                mascotProvider.updateMessage(i18n.cleanup);
         }
         // フラグをリセット
         hasPunished = false;
@@ -355,7 +374,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const nestLimit = 8; // 指定階層以上で指摘
 
         if (maxDepth >= nestLimit) {
-          const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
+          const msg = i18n.nesting.complaint(maxDepth);
           mascotProvider.updateMessage(msg);
 
           // ネストのチェックの時間を更新し、しばらくは静かにさせる
@@ -367,7 +386,7 @@ export async function activate(context: vscode.ExtensionContext) {
       // ---------------------------------------------------------
 
       if (previousErrorCount === -1 || previousErrorCount > 0) {
-        const msg = "エラーないね...完璧すぎてつまんない。もっと私に頼ってよ。";
+        const msg = i18n.perfect;
         vscode.window.showInformationMessage(msg);
         mascotProvider.updateMessage(msg);
       }
@@ -384,8 +403,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (errors.length >= angerThreshold) {
       // ★サイドバーを「激怒モード」にする！
       mascotProvider.updateMood(true);
-      mascotProvider.updateMessage(
-        "エラーこんなにあるじゃん…私のこと嫌いなの？",
+      mascotProvider.updateMessage(i18n.mascot.angry
       );
 
       const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -394,7 +412,7 @@ export async function activate(context: vscode.ExtensionContext) {
       if (!hasPunished && workspaceFolders) {
         hasPunished = true;
         await changeWindowColor(true);
-        vscode.window.showErrorMessage("エラー直してくれないから...ね？");
+        vscode.window.showErrorMessage(i18n.letter1.message);
         showMenheraTerminal("エラー多すぎ...\n私のこと嫌いなの？", 'anger');
 
         if (enableVoice) {
@@ -407,17 +425,13 @@ export async function activate(context: vscode.ExtensionContext) {
         }
 
         runPunishmentLogic(
-          workspaceFolders,
-          "私からの手紙.txt",
-          "ねぇ...\n\nエラー、多すぎない...？\n\n私のこと大切にしてない証拠だよね。\n画面真っ赤にしちゃった...\nあなたのPCも私の心と同じ色になればいいのに。\n\n反省して直してよ。\n直してくれなきゃ、一生このままだよ...？",
-        );
+          workspaceFolders, i18n.letter1.filename, i18n.letter1.content);
       }
 
       // B. 追撃タイマー
       if (!stagnationTimeout && !morePunished && workspaceFolders) {
         stagnationTimeout = setTimeout(async () => {
-          vscode.window.showErrorMessage("ずっと放置してる...信じられない。");
-
+          vscode.window.showErrorMessage(i18n.letter2.message);
           if (enableVoice) {
             const audioPath = path.join(
               context.extensionPath,
@@ -426,11 +440,7 @@ export async function activate(context: vscode.ExtensionContext) {
             );
             playAudio(audioPath);
           }
-          await runPunishmentLogic(
-            workspaceFolders,
-            "まだ直さないの.txt",
-            "...まだ直さないの？\n私のこと無視してるよね？\n\nもう許さないから。\nずっと見てるんだからね。",
-          );
+          await runPunishmentLogic(workspaceFolders, i18n.letter2.filename, i18n.letter2.content);
           morePunished = true;
           stagnationTimeout = undefined;
         }, 30000); // 30秒後
@@ -463,7 +473,7 @@ export async function activate(context: vscode.ExtensionContext) {
         targetError.range.start.line,
       ).range.end;
       const range = new vscode.Range(EndOfErrorLine, EndOfErrorLine);
-      const message = await CreateMessage(targetError, apiKey);
+      const message = await CreateMessage(targetError, apiKey, i18n);
 
       if (i === 0) {
         sidebarMessage = message;
@@ -492,22 +502,21 @@ export async function activate(context: vscode.ExtensionContext) {
   const helloWorldCommand = vscode.commands.registerCommand(
     "menhera-ai.helloWorld",
     () => {
+      const i18n = getLocale();
       const editor = vscode.window.activeTextEditor;
       if (editor) {
-        const messages = [
-          "ねぇ、その変数名なに？浮気？",
-          "コード動いたね…でも私の心は動かないよ",
-          "エラー出てないけど、私への愛は足りてる？",
-        ];
+        const messages = i18n.helloWorld;
         const randomMsg = messages[Math.floor(Math.random() * messages.length)];
         vscode.window.showInformationMessage(randomMsg);
         say.speak(randomMsg, null, 1.0);
       } else {
-        const errorMsg =
-          "ファイル開いてないじゃん…私のこと無視する気？信じられない...";
+        const errorMsg = i18n.noFile;
         vscode.window.showErrorMessage(errorMsg);
         say.speak(errorMsg, null, 1.0);
+<<<<<<< HEAD
         // エラー時は強制的に激怒モードに
+=======
+>>>>>>> bdabc4d83bdd2bfc37812103830a86121213b1cf
         mascotProvider.updateMood(true);
         mascotProvider.updateMessage(errorMsg);
       }
@@ -636,14 +645,15 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
 
           const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
 
+          const i18n = getLocale();
           // 判定
           if (!isValid) {
             mascotProvider.updateMood(true);
             const firstLine = message.split('\n')[0];
-            mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
+            mascotProvider.updateMessage(i18n.git.invalidCommit(firstLine));
             await changeWindowColor(true);
-            vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
-            showMenheraTerminal(`ねぇ、さっきのコミット...\n"${firstLine}" ってなに？\n適当すぎ。ちゃんと書いてよ。`, 'anger');
+            vscode.window.showErrorMessage(i18n.git.invalidCommit_toast);
+            showMenheraTerminal(i18n.git.invalidCommit_term(firstLine), 'anger');
           } else {
             mascotProvider.updateMood(false);
             await changeWindowColor(false);
@@ -766,9 +776,15 @@ async function runPunishmentLogic(
   }
 }
 
+<<<<<<< HEAD
 // メンヘラAIが生成した手紙ファイルを削除し、タブを閉じるクリーンアップ処理
 async function cleanupLetterFiles(rootPath: vscode.Uri) {
   const filesToDelete = ["私からの手紙.txt", "まだ直さないの.txt"];
+=======
+// メンヘラAIが生成した手紙ファイルを削除し、タブを閉じる
+async function cleanupLetterFiles(rootPath: vscode.Uri,i18n: Locale) {
+  const filesToDelete = [i18n.letter1.filename, i18n.letter2.filename];
+>>>>>>> bdabc4d83bdd2bfc37812103830a86121213b1cf
 
   for (const fileName of filesToDelete) {
     const fileUri = vscode.Uri.joinPath(rootPath, fileName);
@@ -798,9 +814,11 @@ async function cleanupLetterFiles(rootPath: vscode.Uri) {
 const CreateMessage = async (
   targetError: vscode.Diagnostic,
   apiKey: string,
+  i18n: Locale
 ): Promise<string> => {
-  if (responses[GetJsonKey(targetError)]) {
-    return responses[GetJsonKey(targetError)];
+if (i18n.responses[GetJsonKey(targetError)]) {
+    // @ts-ignore
+    return i18n.responses[GetJsonKey(targetError)];
   }
   return vscode.window.withProgress(
     {
@@ -831,11 +849,11 @@ const CreateMessage = async (
             },
           ],
         });
-        const prompt = `${MENHERA_PROMPT}\n\nエラーメッセージ: "${targetError.message}"`;
+        const prompt = `${i18n.prompt}\n\nError Message: "${targetError.message}"`;
         const result = await model.generateContent(prompt);
         return result.response.text().trim();
       } catch (err) {
-        return "通信エラー...誰と電話してたの？(API Error)";
+        return i18n.apiError;
       }
     },
   );

@@ -3,10 +3,15 @@ import * as vscode from 'vscode';
 export class MenheraViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'menhera-ai.mascotView';
     private _view?: vscode.WebviewView;
+    private _currentInitialMessage: string = "";
 
     constructor(private readonly _extensionUri: vscode.Uri) { }
 
     // Webviewの初期化とHTMLの設定
+    public setInitialMessage(message: string) {
+        this._currentInitialMessage = message;
+    }
+
     public resolveWebviewView(webviewView: vscode.WebviewView) {
         this._view = webviewView;
 
@@ -38,6 +43,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
         const logoUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'new_menhera_logo.png'));
         // 激怒画像のパス（ここに追加！）
         const angryUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'images', 'menhela-first.png'));
+        const initialMsg = this._currentInitialMessage || "Loading...";
 
         return `<!DOCTYPE html>
         <html lang="ja">
@@ -89,7 +95,7 @@ export class MenheraViewProvider implements vscode.WebviewViewProvider {
             </style>
         </head>
         <body>
-            <div id="message" class="bubble">ねぇ、ずっとコード書いてるね。私のことも見てよ...</div>
+            <div id="message" class="bubble">${initialMsg}</div>
             <img id="mascot-img" class="logo" src="${logoUri}">
             
             <script>
