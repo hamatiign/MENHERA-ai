@@ -1,4 +1,4 @@
-fimport * as vscode from "vscode";
+import * as vscode from "vscode";
 import { MenheraViewProvider } from "./mascotView";
 import * as cp from "child_process";
 const say = require("say");
