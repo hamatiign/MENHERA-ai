@@ -101,7 +101,10 @@
         },
         "menhera-ai.language": {
           "type": "string",
-          "enum": ["ja", "en"],
+          "enum": [
+            "ja",
+            "en"
+          ],
           "default": "ja",
           "description": "Menhera AI Language / メンヘラAIの言語設定"
         }

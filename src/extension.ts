@@ -80,9 +80,11 @@ function ensureEyeStatusBars() {
 function showEyeWhileTyping() {
   const items = ensureEyeStatusBars();
 
+  const i18n = getLocale();
+
   // タイピングのたびにメッセージの配置をシャッフル（点滅ではなく、内容が入れ替わる程度）
   items.forEach((item, index) => {
-    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % MESSAGES.length];
+    const msg = MESSAGES[(index + Math.floor(Date.now() / 1000)) % i18n.eyeMessages.length];
     item.text = `$(eye) ${msg}`;
     item.show();
   });
@@ -184,6 +186,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const WORK_LIMIT_2 = 2 * 60 * 60 * 1000; 
 
   const checkWorkSession = () => {
+    const i18n = getLocale();
     const now = Date.now();
     
     // 休憩判定（前回の操作から一定時間経過していたらリセット）
@@ -196,16 +199,16 @@ export async function activate(context: vscode.ExtensionContext) {
     const sessionDuration = now - currentSessionStartTime;
 
     if (sessionDuration > WORK_LIMIT_2 && workLevelNotified < 2) {
-      const msg = "もう2時間も私よりコードを見てる...。\n休憩しないなら、勝手にPCの電源切っちゃうよ？";
+      const msg = i18n.workSession.limit2;
       vscode.window.showWarningMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("もう2時間も私よりコードを見てる...\n休憩しないなら、勝手にPCの電源切っちゃうよ？", 'anger');
+      showMenheraTerminal(i18n.workSession.limit2_term, 'anger');
       workLevelNotified = 2;
     } else if (sessionDuration > WORK_LIMIT_1 && workLevelNotified < 1) {
-      const msg = "ねぇ、まだやるの？目が悪くなっちゃうよ...\n私の顔、ちゃんと見えなくなったら嫌だから休憩して？";
+      const msg = i18n.workSession.limit1;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("ねぇ、まだやるの？\n目が悪くなっちゃうよ...\n休憩して？", 'love');
+      showMenheraTerminal(i18n.workSession.limit1_term, 'love');
       workLevelNotified = 1;
     }
   };
@@ -222,31 +225,33 @@ export async function activate(context: vscode.ExtensionContext) {
     if (idleTimer) { clearTimeout(idleTimer); }
     if (heavyIdleTimer) { clearTimeout(heavyIdleTimer); }
 
+    const i18n = getLocale();
+
     // スパムモード解除
     if (spamInterval) {
       clearInterval(spamInterval);
       spamInterval = undefined;
       mascotProvider.updateMood(false);
-      const msg = "あ、やっと動いた。もう...どこ行ってたの？";
+      const msg = i18n.idle.welcomeBack;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("あ、やっと動いた。\nもう...どこ行ってたの？", 'love');
+      showMenheraTerminal(i18n.idle.welcomeBack_term, 'love');  
     }
 
     // 第1段階: 生存確認
     idleTimer = setTimeout(() => {
-      const msg = "え...生きてる？";
+      const msg = i18n.idle.alive;
       vscode.window.showInformationMessage(msg);
       mascotProvider.updateMessage(msg);
-      showMenheraTerminal("え...生きてる？\n返事してよ...", 'love');
+      showMenheraTerminal(i18n.idle.alive_term, 'love');
     }, IDLE_THRESHOLD_1);
 
     // 第2段階: 大量通知（スパム）
     heavyIdleTimer = setTimeout(() => {
       mascotProvider.updateMood(true);
-      const spamMessages = ["ねぇ", "どこ？", "無視？", "ねぇねぇ", "おーい", "死んじゃったの？", "捨てられた？", "返事して", "ねぇってば"];
+      const spamMessages = i18n.idle.spamList;
       
-      showMenheraTerminal("ねぇ...無視しないでよ...\nどこに行っちゃったの？", 'anger');
+      showMenheraTerminal(i18n.idle.spam_term, 'anger');
 
       spamInterval = setInterval(() => {
         const randomMsg = spamMessages[Math.floor(Math.random() * spamMessages.length)];
@@ -352,7 +357,7 @@ if (editor.document.fileName.endsWith(i18n.letter1.filename) ||
         const nestLimit = 8; // 指定階層以上で指摘
 
         if (maxDepth >= nestLimit) {
-          const msg = `エラーは消えたけどさ…ネスト、深くしすぎじゃない？(最大の深さ:${maxDepth})\n複雑なコード書く人って、私苦手だな。\n\nもっとシンプルに書いてよ。`;
+          const msg = i18n.nesting.complaint(maxDepth);
           mascotProvider.updateMessage(msg);
 
           // ネストのチェックの時間を更新し、しばらくは静かにさせる
@@ -587,14 +592,15 @@ const gitExtension = vscode.extensions.getExtension<any>('vscode.git');
 
           const isValid = CONVENTIONAL_COMMIT_REGEX.test(message);
 
+          const i18n = getLocale();
           // 判定
           if (!isValid) {
             mascotProvider.updateMood(true);
             const firstLine = message.split('\n')[0];
-            mascotProvider.updateMessage(`ねぇ、さっきのコミット（${firstLine}）なに…？適当すぎ。`);
+            mascotProvider.updateMessage(i18n.git.invalidCommit(firstLine));
             await changeWindowColor(true);
-            vscode.window.showErrorMessage("ねぇ、コミットメッセージ適当すぎ。ちゃんと書いてよ。");
-            showMenheraTerminal(`ねぇ、さっきのコミット...\n"${firstLine}" ってなに？\n適当すぎ。ちゃんと書いてよ。`, 'anger');
+            vscode.window.showErrorMessage(i18n.git.invalidCommit_toast);
+            showMenheraTerminal(i18n.git.invalidCommit_term(firstLine), 'anger');
           } else {
             mascotProvider.updateMood(false);
             await changeWindowColor(false);
