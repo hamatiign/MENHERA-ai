@@ -9,7 +9,7 @@ import {
   HarmCategory,
   HarmBlockThreshold,
 } from "@google/generative-ai";
-import { locales, defaultLocate, Locale } from "./locales";
+import { locales, defaultLocale, Locale } from "./locales";
 import { getMenheraTerminalLayout, createColorString } from "./data/terminal";
 
 // conventional commit のリスト
