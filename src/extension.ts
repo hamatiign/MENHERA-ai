@@ -36,7 +36,7 @@ const menheraDecorationType = vscode.window.createTextEditorDecorationType({
 
 const hoverDecorationType = vscode.window.createTextEditorDecorationType({});
 
-const responses: { [key: string]: string } = responsesData;
+const responses: { [key: string]: string } = responses;
 let previousErrorCount = -1;
 let morePunished = false;
 let stagnationTimeout: NodeJS.Timeout | undefined;
